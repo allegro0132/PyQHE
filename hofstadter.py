@@ -1,14 +1,13 @@
 # %%
 import qutip as qt
 import numpy as np
-from matplotlib import pyplot as plt
-from scipy.fft import fft2, fftshift, fftfreq
+from matplotlib import cm, pyplot as plt
+from matplotlib.ticker import LinearLocator
+from scipy.fft import fft, fft2, fftshift, fftfreq
 
 from core.method import TightBinding
 
 
-# %%
-# create magnetic class with gauge
 class Magnetic:
     """The demo codes only support magnetic field B along the z-axis.
     """
@@ -44,13 +43,8 @@ class Magnetic:
             ])
 
         self.vpotential = func_a
-# %%
-mag = Magnetic([0,0,1])
-mag.landau_gauge('x')
-lattice = np.reshape(np.arange(30), (10,3))
-[mag.vpotential(point) for point in lattice]
 
-# %%
+
 class Hofstadter(TightBinding):
     """Calculate a lattice model.
     """
@@ -104,41 +98,69 @@ class Hofstadter(TightBinding):
                     self.vpotential)
                 self.hamiltonian += periodic_term + periodic_term.dag()
 
-    def transform_to_momentum_space(self):
+    def transform_to_momentum_space(self, k_point):
         """2-d Discrete Fourier Transfrom."""
-        # related k points after DFT
-        k_y = fftfreq(self.dim[0], 1)
-        k_x = fftfreq(self.dim[1], 1)
+
         # define unitary matrix for Fourier Transform
-        dft_matrix = np.zeros(self.hamiltonian.shape, complex)
+        dft_matrix = []
         for n in range(self.dim[0]):
             for m in range(self.dim[1]):
-                dft_matrix[n * m + m][:] = np.exp(
-                    -2j * np.pi * m * np.tile(k_x, self.dim[0])) * np.exp(
-                        2j * np.pi * n * np.repeat(k_y, self.dim[1]))
-        dft_matrix = dft_matrix / np.sqrt(len(dft_matrix))  # normalize
-        self.hamiltonian_k = dft_matrix.conjugate().T @ self.hamiltonian.full(
-        ) @ dft_matrix
+                dft_matrix = np.concatenate([
+                    dft_matrix, [np.exp(2j * np.pi * np.dot(k_point, [n, m]))]
+                ])
+        h_dim = self.dim[0] * self.dim[1]
+        dft_matrix = np.reshape(dft_matrix, (h_dim, 1))
+        dft_matrix = dft_matrix / np.sqrt(h_dim)  # normalize
+        self.fmat = dft_matrix
+        return dft_matrix.conjugate().T @ self.hamiltonian.full() @ dft_matrix
 
-    def calc_band_dispersion(self):
+    def solve_klist(self, k_list):
+        """Solve eigenvalue at selected kpoints in reciprocal lattice
+        """
+
+        eig_list = []
+        for kpoint in k_list:
+            h_k = self.transform_to_momentum_space(kpoint)
+            eig_k, eigv_k = np.linalg.eigh(h_k)
+            eig_list.append(eig_k)
+        return np.asarray(eig_list)
+
+    def calc_band_dispersion_2d(self, grid=30):
         """Calculate eigenenergy and eigenvector in momentum space.
         """
-        eig_k, eigv_k = np.linalg.eigh(self.hamiltonian_k)
-        self.eig_k = np.reshape(eig_k, self.dim)
+
+        k_x = np.linspace(-0.5, 0.5, grid)
+        k_y = np.linspace(-0.5, 0.5, grid)
+        k_list = np.array([[[k_yn, k_xm] for k_xm in k_x] for k_yn in k_y])
+        k_y, k_x = np.meshgrid(k_y, k_x)
+        eig_list = self.solve_klist(np.reshape(k_list, (grid**2, 2)))
+        eig_list = np.reshape(eig_list, k_list.shape[:2])
+
+        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        surf = ax.plot_surface(k_y,
+                               k_x,
+                               eig_list,
+                               cmap=cm.coolwarm,
+                               linewidth=0,
+                               antialiased=False)
+        # Customize the z axis.
+        # ax.set_zlim(-1.01, 1.01)
+        ax.zaxis.set_major_locator(LinearLocator(10))
+        # A StrMethodFormatter is used automatically
+        ax.zaxis.set_major_formatter('{x:.02f}')
+        plt.show()
+        return eig_list
 
     def calc_eig(self):
-        hermitian = self.hamiltonian.full()
-        return np.linalg.eigh(hermitian)
+        eig, eigv = np.linalg.eigh(self.hamiltonian)
+        self.eig = np.reshape(eig, self.dim)
 
 
-
+# %%
+mag = Magnetic([0, 0, 1])
 mag.landau_gauge()
-hof = Hofstadter(3,5,0,1, alpha=0.3, q=0, magnetic=mag)
+hof = Hofstadter(21, 21, 0, 1, alpha=0.1, q=0, magnetic=mag)
 hof.add_periodic_bound()
 hof.hamiltonian
 # %%
-hof.hamiltonian * qt.basis(hof.dim, [2,1])
-# %%
-hof.transform_to_momentum_space()
-hof.calc_band_dispersion()
-# %%
+hof.calc_band_dispersion_2d()
