@@ -11,7 +11,10 @@ class TightBinding:
     def __init__(self) -> None:
         self.dim = []
 
-    def hopping(self, a: list, b: list, alpha, q, vpotential: Callable = None, reciprocal=False):
+    def _gen_reciprocal_lattice(self):
+        self.k_vec = [1 / self.dim[0], 1 / self.dim[1]]
+
+    def hopping(self, a: list, b: list, alpha, q, vpotential: Callable = None, hopping_1d=False):
         """Hopping from point A to B. Calculate phase in finite different mothod.
         """
         if not vpotential:
@@ -25,7 +28,7 @@ class TightBinding:
         # Peierls substitution
         hbar = 1
         add_phase = np.exp(q / hbar * phase * 2j * np.pi)
-        if reciprocal:
+        if hopping_1d:
             return add_phase * (qt.basis(self.dim[1], b[1]) *
                                 qt.basis(self.dim[1], a[1]).dag())
         return add_phase * (qt.basis(self.dim, b) * qt.basis(self.dim, a).dag())
