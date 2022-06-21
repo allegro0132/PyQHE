@@ -4,8 +4,7 @@ import numpy as np
 from matplotlib import cm, pyplot as plt
 from matplotlib.ticker import LinearLocator
 
-from core.method import TightBinding
-
+from pyqhe.core.method import TightBinding
 
 class Magnetic:
     """The demo codes only support magnetic field B along the z-axis.
