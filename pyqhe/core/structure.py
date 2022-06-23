@@ -1,5 +1,5 @@
 # %%
-from abc import abstractmethod, ABC
+from abc import abstractmethod, ABC, abstractproperty
 import numpy as np
 from scipy.interpolate import interp1d, CubicSpline
 import qutip
@@ -16,13 +16,13 @@ class SplineStorage:
     """
 
     def __init__(self, params: np.ndarray, grid: np.ndarray,
-                 method: str = 'intep1d', **kwargs) -> None:
+                 method: str = 'interp1d', **kwargs) -> None:
 
         self.params = params
         self.grid = grid
         self.method = method
         if method == 'interp1d':
-            kind = kwargs.get(kind, 'linear')
+            kind = kwargs.get('kind', 'linear')
             self.func = interp1d(self.grid,
                                  self.params,
                                  kind=kind,
@@ -206,8 +206,10 @@ class Structure1D:
         self.layer_arrange()
         # Generate a 'universal grid'. Cache data in ndarray with the same
         # dimension as 'universal grid'.
-        self.universal_grid = None
-        # Structure's parameters
+        self._universal_grid = None
+        # Structure's properties
+        self.fi = None
+        self.cb_meff = None
         self.eps = None
         self.doping = None
         # Schrodinger equation's parameters
@@ -216,6 +218,12 @@ class Structure1D:
         self.potential = None
         self.e_field = None
         self._prepare_structure_stroage(spline_storage=spline_storage)
+
+    @abstractproperty
+    def universal_grid(self):
+        if self._universal_grid is None:
+            self._prepare_structure_stroage()
+        return self._universal_grid
 
     def layer_arrange(self):
         """Arrange every layer in `self.layers` and build the stack.
@@ -252,17 +260,33 @@ class Structure1D:
 
         num_gridpoint = round(self.stack_thick / dx)
         # Generate a identity grid
-        self.universal_grid = self.generate_grid(num_gridpoint)
+        self._universal_grid = self.generate_grid(num_gridpoint)
         eps = np.zeros(self.universal_grid.shape)
+        fi = np.zeros(self.universal_grid.shape)
+        cb_meff = np.zeros(self.universal_grid.shape)
+
         for layer in self.layers:
             layer_mask = (self.universal_grid >= layer.loc[0]) * (self.universal_grid < layer.loc[1])
             eps[layer_mask] = layer.eps
+            fi[layer_mask] = layer.fi
+            cb_meff[layer_mask] = layer.cb_meff
+        # Choose storage type
         if spline_storage:
             self.eps = SplineStorage(eps, self.universal_grid)
+            self.fi = SplineStorage(fi, self.universal_grid)
+            self.cb_meff = SplineStorage(cb_meff, self.universal_grid)
         else:
             self.eps = eps
+            self.fi = fi
+            self.cb_meff = cb_meff
+
+    def delta_doping(self, position, density):
+        """Generate doping profile by the modern delta doping."""
+
+        doping = np.zeros(self.universal_grid.shape)
+        self.doping = doping
 # %%
 # QuickTest
-stack0 = Structure1D()
+stack0 = Structure1D(spline_storage=True)
 
 # %%
