@@ -20,7 +20,7 @@ class TightBinding:
         if not vpotential:
             phase = 0
         else:
-            phase = (alpha * (b[0] - a[0]) * # hopping at y axis
+            phase = (alpha * (b[0] - a[0]) *  # hopping at y axis
                      (vpotential(alpha * np.flip(b))[1] +
                       vpotential(alpha * np.flip(a))[1]) / 2 + alpha *
                      (b[1] - a[1]) * (vpotential(alpha * np.flip(b))[0] +

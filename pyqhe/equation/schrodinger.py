@@ -27,19 +27,12 @@ class SchrodingerShooting:
         # Shooting method parameters for Schrödinger Equation solution
         # Energy step (Joules) for initial search. Initial delta_E is 1 meV.
         self.delta_e = 0.5 * const.meV2J
-        # Energy step (Joules) within Newton-Raphson method when improving the
-        # precision of the energy of a found level.
-        self.d_e = 1e-5 * const.meV2J
-        # Energy to start shooting method from (if E_start = 0.0 uses minimum of
-        # energy of bandstructure)
-        self.e_start = 0.0
-        self.threshold_e = 1e-9 * const.meV2J  # for convergence test
 
     def _psi_iteration(self, energy_x0):
         """Use `numpy.nditer` to get iteration solution.
 
         Args:
-            energy_x0: energy to start shoot eigenenergy.
+            energy_x0: energy to start wavefunction iteration.
         Returns:
             Diverge of psi at infinite x.
         """
@@ -101,34 +94,39 @@ class SchrodingerShooting:
 
         return eig_val
 
-    def calc_wavefunction(self, eigenenergy):
-        """Calculate wave function for a given eigenenergy.
+    def calc_esys(self, **kwargs):
+        """Calculate wave function and eigenenergy.
 
         Args:
-            eigenenergy: Schrodinger equation's eigenenergy.
+            max_energy: shooting eigenenergy that smaller than `max_energy`
+            num_band: number of band to shoot eigenenergy.
+            energy_x0: minimum energy to start subband search. (Unit in Joules)
+            kwargs: argument for `scipy.optimize.root_scalar`
         """
 
-        self._psi_iteration(eigenenergy)
-        # normalize wavefunction
-        norm = np.linalg.norm(self.psi)
+        eig_val = self.calc_evals(**kwargs)
+        wave_function = []
+        for energy in eig_val:
+            self._psi_iteration(energy)
+            norm = np.linalg.norm(self.psi)
+            wave_function.append(self.psi / norm)
 
-        return self.psi / norm
+        return eig_val, wave_function
 
 
 # %%
-# QuickTest
-from matplotlib import pyplot as plt
+# # QuickTest
+# from matplotlib import pyplot as plt
 
-grid = np.linspace(0, 10, 100)
-psi = np.zeros(grid.shape)
-v_potential = np.ones(grid.shape) * 10
-# Quantum well
-v_potential[40:61] = 0
-cb_meff = np.ones(grid.shape)
-energy = 1
-solver = SchrodingerShooting(grid, psi, energy, v_potential, cb_meff)
-eig_v = solver.calc_evals(0)
-# %%
-plt.plot(solver.grid, solver.v_potential / 10)
-plt.plot(solver.grid, np.asarray([solver.calc_wavefunction(eig_v[i]) for i in range(3)]).T)
-# %%
+# grid = np.linspace(0, 10, 100)
+# psi = np.zeros(grid.shape)
+# v_potential = np.ones(grid.shape) * 10
+# # Quantum well
+# v_potential[40:61] = 0
+# cb_meff = np.ones(grid.shape)
+# energy = 1
+# solver = SchrodingerShooting(grid, psi, energy, v_potential, cb_meff)
+# eig_v = solver.calc_evals(0)
+# # %%
+# plt.plot(solver.grid, solver.v_potential / 10)
+# plt.plot(solver.grid, np.asarray([solver.calc_wavefunction(eig_v[i]) for i in range(3)]).T)
