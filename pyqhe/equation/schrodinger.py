@@ -7,7 +7,7 @@ import pyqhe.utility.constant as const
 
 
 class SchrodingerShooting:
-    """Shooting method for calculation Schrodinger equation."""
+    """Shooting method solver for calculation Schrodinger equation."""
 
     def __init__(self,
                  grid: np.ndarray,
