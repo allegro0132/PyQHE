@@ -191,9 +191,12 @@ class Layer:
 
 class Structure1D:
     """Class for modeling 1d material structure.
+
+    Args:
+        temp: Temperature, unit in Kelvin
     """
 
-    def __init__(self, spline_storage=False) -> None:
+    def __init__(self, temp=0.01, spline_storage=False) -> None:
         # Initialize Layers
         layer0 = Layer(10, 0, name='barrier')
         layer1 = Layer(5, 1, name='quantum_wall')
@@ -202,21 +205,17 @@ class Structure1D:
         # Structure's parameter
         self.stack = None
         self.stack_thick = None
-        self.bound_locs = None
+        self.bound_locs = None  # Boundary locations
         self.layer_arrange()
         # Generate a 'universal grid'. Cache data in ndarray with the same
         # dimension as 'universal grid'.
         self._universal_grid = None
         # Structure's properties
+        self.temp = temp
         self.fi = None
         self.cb_meff = None
         self.eps = None
         self.doping = None
-        # Schrodinger equation's parameters
-        self.psi = None
-        # Poisson equation's parameters
-        self.potential = None
-        self.e_field = None
         self._prepare_structure_stroage(spline_storage=spline_storage)
 
     @abstractproperty

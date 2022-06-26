@@ -11,14 +11,10 @@ class SchrodingerShooting:
 
     def __init__(self,
                  grid: np.ndarray,
-                 psi: np.ndarray,
-                 energy,
                  v_potential,
                  cb_meff) -> None:
 
-        self.psi = psi  # Wave function
         # Schrodinger equation's parameters
-        self.energy = energy
         self.v_potential = v_potential
         self.cb_meff = cb_meff
         # parse grid configuration
@@ -27,6 +23,8 @@ class SchrodingerShooting:
         # Shooting method parameters for Schrödinger Equation solution
         # Energy step (Joules) for initial search. Initial delta_E is 1 meV.
         self.delta_e = 0.5 * const.meV2J
+        # Cache parameters
+        self.psi = None
 
     def _psi_iteration(self, energy_x0):
         """Use `numpy.nditer` to get iteration solution.
@@ -37,7 +35,7 @@ class SchrodingerShooting:
             Diverge of psi at infinite x.
         """
 
-        psi = np.zeros(self.psi.shape)
+        psi = np.zeros(self.grid.shape)
         psi[0] = 0.0
         psi[1] = 1.0
         const_0 = 2 * (self.delta_z / const.hbar)**2
@@ -94,7 +92,7 @@ class SchrodingerShooting:
 
         return eig_val
 
-    def calc_esys(self, **kwargs):
+    def calc_esys(self, energy_x0, **kwargs):
         """Calculate wave function and eigenenergy.
 
         Args:
@@ -104,7 +102,7 @@ class SchrodingerShooting:
             kwargs: argument for `scipy.optimize.root_scalar`
         """
 
-        eig_val = self.calc_evals(**kwargs)
+        eig_val = self.calc_evals(energy_x0, **kwargs)
         wave_function = []
         for energy in eig_val:
             self._psi_iteration(energy)
