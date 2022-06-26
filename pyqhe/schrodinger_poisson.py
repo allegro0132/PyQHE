@@ -1,8 +1,7 @@
 import numpy as np
 
-import pyqhe.utility.constant as const
 from pyqhe.equation.schrodinger import SchrodingerShooting
-from pyqhe.equation.poisson import Poisson1D
+from pyqhe.equation.poisson import PoissonODE, PoissonFDM
 from pyqhe.utility.fermi import FermiStatistic
 from pyqhe.core.structure import Structure1D
 
@@ -14,7 +13,7 @@ class OptimizeResult:
         # Storage of grid configure
         self.grid = None
         # Optimizer result
-        self.v_potential = None
+        self.params = None
         # Fermi Statistic
         self.n_states = None
         self.sigma = None
@@ -22,6 +21,7 @@ class OptimizeResult:
         self.eig_val = None
         self.wave_function = None
         # electric field properties
+        self.v_potential = None
         self.e_field = None
 
 
@@ -50,10 +50,11 @@ class SchrodingerPoisson:
         self.learning_rate = learning_rate
         # load solver
         self.sch_solver = SchrodingerShooting(self.grid, self.fi, self.cb_meff)
-        self.poi_solver = Poisson1D(self.grid, self.doping, self.eps)
+        self.poi_solver = PoissonFDM(self.grid, self.doping, self.eps)
         self.fermi_util = FermiStatistic(self.grid, self.cb_meff, self.doping)
         # Cache parameters
-        self.eig_val = self.sch_solver.calc_evals(0)
+        self.eig_val = self.sch_solver.calc_evals()
+        self.params = None
 
     def _calc_net_density(self, n_states, wave_func):
         """Calculate the net charge density."""
@@ -69,7 +70,7 @@ class SchrodingerPoisson:
         # Let dopants density minus electron density
         return doping_2d - elec_density
 
-    def _iteration(self, v_potential):
+    def _iteration(self, params):
         """Perform a single iteration of self-consistent Schrodinger-Poisson
         calculation.
 
@@ -78,8 +79,9 @@ class SchrodingerPoisson:
         """
 
         # perform schrodinger solver
+        v_potential = self.fi + params
         self.sch_solver.v_potential = v_potential
-        eig_val, wave_func = self.sch_solver.calc_esys(0)
+        eig_val, wave_func = self.sch_solver.calc_esys()
         # calculate energy band distribution
         _, n_states = self.fermi_util.fermilevel(eig_val, wave_func, self.temp)
         # calculate the net charge density
@@ -88,7 +90,7 @@ class SchrodingerPoisson:
         self.poi_solver.charge_density = sigma
         self.poi_solver.calc_poisson()
         # return eigenenergy loss
-        loss = np.sum((self.eig_val - eig_val)**2)
+        loss = np.abs(self.eig_val[0] - eig_val[0])
         params = self.poi_solver.v_potential
         self.eig_val = eig_val
 
@@ -103,23 +105,28 @@ class SchrodingerPoisson:
         Args:
             learning_rate: learning rate between adjacent iteration.
         """
-        params = self.fi  # v_potential
+        if self.params is None:
+            self.params = 0  # v_potential
         for _ in range(num_iter):
             # perform a iteration
-            loss, temp_params = self._iteration(params)
+            loss, temp_params = self._iteration(self.params)
             if logging:
-                print(f'Loss: {loss}, energy_0: {self.eig_val[0]}, \
-                energy_1: {self.eig_val[1]}, energy_2: {self.eig_val[2]}'                                                                         )
+                print(f'Loss: {loss}, energy_0: {self.eig_val[0]}, '
+                      f'energy_1: {self.eig_val[1]}')
             # self-consistent update params
-            params += learning_rate * temp_params
+            # params += learning_rate * temp_params
+            self.params = temp_params
         # save optimize result
         res = OptimizeResult()
+        res.params = self.params
         res.grid = self.grid
-        res.v_potential = params
+        res.v_potential = self.params + self.fi
         # reclaim convergence result
         self.sch_solver.v_potential = res.v_potential
-        res.eig_val, res.wave_function = self.sch_solver.calc_esys(0)
-        _, res.n_states = self.fermi_util.fermilevel(res.eig_val, res.wave_function, self.temp)
+        res.eig_val, res.wave_function = self.sch_solver.calc_esys()
+        _, res.n_states = self.fermi_util.fermilevel(res.eig_val,
+                                                     res.wave_function,
+                                                     self.temp)
         res.sigma = self._calc_net_density(res.n_states, res.wave_function)
         self.poi_solver.charge_density = res.sigma
         self.poi_solver.calc_poisson()

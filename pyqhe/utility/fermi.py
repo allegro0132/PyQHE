@@ -6,7 +6,7 @@ import pyqhe.utility.constant as const
 
 def calc_meff_state(wave_function, cb_meff):
     """Calculate subband effective mass."""
-
+    wave_function = np.asarray(wave_function)
     return 1.0 / np.sum(wave_function**2 / cb_meff, axis=1)
 
 
@@ -40,8 +40,9 @@ class FermiStatistic:
         """integral of Fermi Dirac Equation for energy independent density of states.
         Ei [meV], Ef [meV], T [K]"""
 
-        return np.log(np.exp(const.meV2J * (fermi_energy - energy) /
-                             (const.kb * temp)) + 1) * const.kb * temp
+        return np.log(
+            np.exp((fermi_energy - energy) /
+                   (const.kb * temp)) + 1) * const.kb * temp
 
     def fermilevel_0k(self, eig_val, wave_function):
         """Calculate Fermi level at 0 K."""
@@ -52,20 +53,20 @@ class FermiStatistic:
         for i, _ in enumerate(eig_val):
             accumulate_energy = np.sum(eig_val[:i + 1])
             candidate_fermi_energy.append(
-                (self.doping_2d * const.hbar**2 * np.pi / self.meff_state[i] *
-                 const.J2meV + accumulate_energy) / (i + 1))
+                (self.doping_2d * const.hbar**2 * np.pi / self.meff_state[i] + accumulate_energy) / (i + 1))
         # check true Fermi energy
         fermi_idx = np.argwhere(
             (np.asarray(candidate_fermi_energy) - eig_val) < 0)
-        if not fermi_idx:
+        if fermi_idx.size == 0:
             raise ValueError(
                 'All energy levels are processed, but no Fermi energy exists.')
+        candidate_fermi_energy = np.asarray(candidate_fermi_energy)
         fermi_energy = candidate_fermi_energy[fermi_idx[0] - 1]
         # Calculate populations of energy levels.
         n_state = []
         for i, eig_v in enumerate(eig_val):
             n_sqrt = (fermi_energy - eig_v) * self.meff_state[i] / (
-                const.hbar**2 * np.pi) * const.meV2J
+                const.hbar**2 * np.pi)
             if n_sqrt < 0:
                 n_sqrt = 0
             n_state.append(n_sqrt**2)
@@ -81,12 +82,13 @@ class FermiStatistic:
                 csb_meff * self.integral_fermi_dirac(eig_v, f_energy, temp)
                 for eig_v, csb_meff in zip(eig_val, self.meff_state)
             ]
-            return self.doping_2d - np.sum(dist) / (const.hbar ** 2 * np.pi)
+            return self.doping_2d - np.sum(dist) / (const.hbar**2 * np.pi)
 
-        f_energy_0k = self.fermilevel_0k(eig_val, wave_function)
-        sol = optimize.root_scalar(func, x0=f_energy_0k, **kwargs)
+        f_energy_0k, _ = self.fermilevel_0k(eig_val, wave_function)
+        # sol = optimize.root_scalar(func, x0=f_energy_0k, method='halley', **kwargs)
 
-        self.fermi_energy = sol.root
+        # self.fermi_energy = sol.root
+        self.fermi_energy = f_energy_0k  # it's hard to converge, just use f_0k now.
         # Calculate populations of energy levels
 
         self.n_states = [

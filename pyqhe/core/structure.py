@@ -1,5 +1,5 @@
-# %%
 from abc import abstractmethod, ABC, abstractproperty
+from typing import List
 import numpy as np
 from scipy.interpolate import interp1d, CubicSpline
 import qutip
@@ -15,8 +15,11 @@ class SplineStorage:
 
     """
 
-    def __init__(self, params: np.ndarray, grid: np.ndarray,
-                 method: str = 'interp1d', **kwargs) -> None:
+    def __init__(self,
+                 params: np.ndarray,
+                 grid: np.ndarray,
+                 method: str = 'interp1d',
+                 **kwargs) -> None:
 
         self.params = params
         self.grid = grid
@@ -43,16 +46,24 @@ class Layer:
     Args:
         thickness: The thickness of layer
         alloy_ratio: a ratio in [0, 1]
+        doping: `+` for n-type doping, `-` for p-type doping
         name: name of the layer
     """
 
-    def __init__(self, thickness: float, alloy_ratio: float, name: str = 'layer') -> None:
+    def __init__(self,
+                 thickness: float,
+                 alloy_ratio: float,
+                 doping: float,
+                 name: str = 'layer') -> None:
 
         self.name = name
         self.loc = None  # The layer locate at [a, b)
-        # define parameters
+        # geometry properties
         self.thickness = thickness
+        # alloying properties
         self.alloy_ratio = alloy_ratio
+        # doping properties
+        self.doping = doping * 1e-21  # cm^-3 to nm^-3
         # Physical parameters
         self.fi = None
         self.eps = None
@@ -156,13 +167,17 @@ class Layer:
             'TAUP0': 0.1E-6,
             'mun0': 0.15,
             'mup0': 0.1,
-            'Cn0': 2.8e-31,  # generation recombination model parameters [cm**6/s]
-            'Cp0': 2.8e-32,  # generation recombination model parameters [cm**6/s]
+            'Cn0':
+                2.8e-31,  # generation recombination model parameters [cm**6/s]
+            'Cp0':
+                2.8e-32,  # generation recombination model parameters [cm**6/s]
             'BETAN': 2.0,
-            'BETAP': 1.0,  # Parameter in calculatation of the Field Dependant Mobility
+            'BETAP':
+                1.0,  # Parameter in calculatation of the Field Dependant Mobility
             'VSATN': 3e5,  # Saturation Velocity of Electrons
             'VSATP': 6e5,  # Saturation Velocity of Holes
-            'AVb_E': -2.1  #Average Valence Band Energy or the absolute energy level
+            'AVb_E':
+                -2.1  #Average Valence Band Energy or the absolute energy level
         }
         # Check alloying radio, and use alloying function
         if self.alloy_ratio < 0 or self.alloy_ratio > 1:
@@ -173,12 +188,12 @@ class Layer:
     def _alloying(self):
         """Calculate ternary material's properties."""
 
-        # Band structure potential, for electron unit in Joule
+        # Band structure potential, for electron unit in eV
         self.fi = self.alloy["Band_offset"] * (
             self.alloy_ratio * self.AlAs["Eg"] +
             (1 - self.alloy_ratio) * self.GaAs["Eg"] -
             self.alloy["Bowing_param"] * self.alloy_ratio *
-            (1 - self.alloy_ratio)) * const.q
+            (1 - self.alloy_ratio))  # * const.q (unit in eV)
         # dielectric constant
         self.eps = (
             self.alloy_ratio * self.AlAs["epsilonStatic"] +
@@ -193,15 +208,16 @@ class Structure1D:
     """Class for modeling 1d material structure.
 
     Args:
+        layer_list: list of layers, order from top to bottom.
         temp: Temperature, unit in Kelvin
     """
 
-    def __init__(self, temp=0.01, spline_storage=False) -> None:
-        # Initialize Layers
-        layer0 = Layer(10, 0, name='barrier')
-        layer1 = Layer(5, 1, name='quantum_wall')
-        layer2 = Layer(10, 0, name='barrier')
-        self.layers = [layer0, layer1, layer2]
+    def __init__(self,
+                 layer_list: List[Layer],
+                 temp=0.01,
+                 spline_storage=False) -> None:
+
+        self.layers = layer_list
         # Structure's parameter
         self.stack = None
         self.stack_thick = None
@@ -248,7 +264,8 @@ class Structure1D:
         """Generate a set of grid for solving differential equation numerically.
         """
 
-        return np.linspace(self.bound_locs[0], self.bound_locs[-1], num_gridpoint)
+        return np.linspace(self.bound_locs[0], self.bound_locs[-1],
+                           num_gridpoint)
 
     def _prepare_structure_stroage(self, dx=1, spline_storage=False):
         """Initialize structure's parameters in `SplineStorage`.
@@ -263,29 +280,29 @@ class Structure1D:
         eps = np.zeros(self.universal_grid.shape)
         fi = np.zeros(self.universal_grid.shape)
         cb_meff = np.zeros(self.universal_grid.shape)
+        doping = np.zeros(self.universal_grid.shape)
 
         for layer in self.layers:
-            layer_mask = (self.universal_grid >= layer.loc[0]) * (self.universal_grid < layer.loc[1])
+            layer_mask = (self.universal_grid >=
+                          layer.loc[0]) * (self.universal_grid <= layer.loc[1])
             eps[layer_mask] = layer.eps
             fi[layer_mask] = layer.fi
             cb_meff[layer_mask] = layer.cb_meff
+            doping[layer_mask] = layer.doping
         # Choose storage type
         if spline_storage:
             self.eps = SplineStorage(eps, self.universal_grid)
             self.fi = SplineStorage(fi, self.universal_grid)
             self.cb_meff = SplineStorage(cb_meff, self.universal_grid)
+            self.doping = SplineStorage(cb_meff, self.universal_grid)
         else:
             self.eps = eps
             self.fi = fi
             self.cb_meff = cb_meff
+            self.doping = doping
 
     def delta_doping(self, position, density):
         """Generate doping profile by the modern delta doping."""
 
         doping = np.zeros(self.universal_grid.shape)
         self.doping = doping
-# %%
-# QuickTest
-stack0 = Structure1D(spline_storage=True)
-
-# %%
