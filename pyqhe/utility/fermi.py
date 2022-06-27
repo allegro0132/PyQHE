@@ -40,9 +40,8 @@ class FermiStatistic:
         """integral of Fermi Dirac Equation for energy independent density of states.
         Ei [meV], Ef [meV], T [K]"""
 
-        return np.log(
-            np.exp((fermi_energy - energy) /
-                   (const.kb * temp)) + 1) * const.kb * temp
+        return np.log(np.exp((fermi_energy - energy) /
+                             (const.kb * temp)) + 1) * const.kb * temp
 
     def fermilevel_0k(self, eig_val, wave_function):
         """Calculate Fermi level at 0 K."""
@@ -53,7 +52,8 @@ class FermiStatistic:
         for i, _ in enumerate(eig_val):
             accumulate_energy = np.sum(eig_val[:i + 1])
             candidate_fermi_energy.append(
-                (self.doping_2d * const.hbar**2 * np.pi / self.meff_state[i] + accumulate_energy) / (i + 1))
+                (self.doping_2d * const.hbar**2 * np.pi / self.meff_state[i] +
+                 accumulate_energy) / (i + 1))
         # check true Fermi energy
         fermi_idx = np.argwhere(
             (np.asarray(candidate_fermi_energy) - eig_val) < 0)
@@ -65,8 +65,8 @@ class FermiStatistic:
         # Calculate populations of energy levels.
         n_state = []
         for i, eig_v in enumerate(eig_val):
-            n_sqrt = (fermi_energy - eig_v) * self.meff_state[i] / (
-                const.hbar**2 * np.pi)
+            n_sqrt = (fermi_energy -
+                      eig_v) * self.meff_state[i] / (const.hbar**2 * np.pi)
             if n_sqrt < 0:
                 n_sqrt = 0
             n_state.append(n_sqrt**2)

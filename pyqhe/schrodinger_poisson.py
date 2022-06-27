@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib import pyplot as plt
 
 from pyqhe.equation.schrodinger import SchrodingerShooting
 from pyqhe.equation.poisson import PoissonODE, PoissonFDM
@@ -15,6 +16,7 @@ class OptimizeResult:
         # Optimizer result
         self.params = None
         # Fermi Statistic
+        self.fermi_energy = None
         self.n_states = None
         self.sigma = None
         # electron properties
@@ -23,6 +25,34 @@ class OptimizeResult:
         # electric field properties
         self.v_potential = None
         self.e_field = None
+
+    def plot_quantum_well(self):
+        """Plot dressed conduction band of quantum well, and electrons'
+        eigenenergy and wave function.
+        """
+
+        wave_func_rescale = 0.2
+        ax = plt.subplot(1, 1, 1)
+        ax.plot(self.grid, self.v_potential, "k")
+        # just plot the three lowest eigenenergy
+        colors = ['y', 'c', 'm']
+        for i, (energy, state) in enumerate(
+                zip(self.eig_val[:3], self.wave_function[:3])):
+            ax.axhline(energy,
+                       0.1,
+                       0.9,
+                       ls="--",
+                       color=colors[i],
+                       label=f'E_{i}: {energy:3f}')  # eigenenergy
+            # plot rescaled wave function
+            ax.plot(self.grid, state * wave_func_rescale + energy, color='b')
+        ax.axhline(self.fermi_energy, 0.1, 0.9, color="r", ls="--")
+        ax.set_xlabel("Position (nm)")
+        ax.set_ylabel("Energy (eV)")
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        ax.grid(True)
+
+        return ax
 
 
 class SchrodingerPoisson:
@@ -33,10 +63,7 @@ class SchrodingerPoisson:
         fermi_util: Use Fermi statistic for Fermi level and energy bands' distribution.
     """
 
-    def __init__(self,
-                 model: Structure1D,
-                 learning_rate=0.5,
-                 ) -> None:
+    def __init__(self, model: Structure1D, learning_rate=0.5, **kwargs) -> None:
         self.model = model
         # load material's properties
         self.temp = model.temp  # temperature
@@ -111,8 +138,9 @@ class SchrodingerPoisson:
             # perform a iteration
             loss, temp_params = self._iteration(self.params)
             if logging:
-                print(f'Loss: {loss}, energy_0: {self.eig_val[0]}, '
-                      f'energy_1: {self.eig_val[1]}')
+                print(
+                    f'Loss: {loss}, energy_0: {self.eig_val[0]}, '
+                    f'energy_1: {self.eig_val[1]}, energy_2: {self.eig_val[2]}')
             # self-consistent update params
             # params += learning_rate * temp_params
             self.params = temp_params
@@ -124,9 +152,8 @@ class SchrodingerPoisson:
         # reclaim convergence result
         self.sch_solver.v_potential = res.v_potential
         res.eig_val, res.wave_function = self.sch_solver.calc_esys()
-        _, res.n_states = self.fermi_util.fermilevel(res.eig_val,
-                                                     res.wave_function,
-                                                     self.temp)
+        res.fermi_energy, res.n_states = self.fermi_util.fermilevel(
+            res.eig_val, res.wave_function, self.temp)
         res.sigma = self._calc_net_density(res.n_states, res.wave_function)
         self.poi_solver.charge_density = res.sigma
         self.poi_solver.calc_poisson()

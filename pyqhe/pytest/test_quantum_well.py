@@ -15,19 +15,15 @@ layer_list.append(Layer(5, 0.3, 0.0, name='cladding'))
 layer_list.append(Layer(5, 0.3, 5e17, name='n-type'))
 layer_list.append(Layer(10, 0.3, 0.0, name='barrier'))
 
-model = Structure1D(layer_list, temp=60)
-# %%
+model = Structure1D(layer_list, temp=10, dx=0.1)
+# instance of class SchrodingerPoisson
 schpois = SchrodingerPoisson(model)
-# drawing initial v_potential and electrons' eigenenergy and wave function
-plt.plot(schpois.grid, schpois.fi)
-plt.hlines(schpois.eig_val, 10, 40)
 # %%
+# perform self consistent optimization
 res = schpois.self_consistent_minimize()
-res.params
 # %%
-plt.plot(res.grid, res.v_potential)
-plt.hlines(res.eig_val, 10, 40)
+# plot result
+res.plot_quantum_well()
 # %%
-plt.plot(res.grid, res.e_field)
-# plt.plot(res.grid, res.wave_function.T + 1)
+res.eig_val
 # %%

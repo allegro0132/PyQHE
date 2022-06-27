@@ -177,7 +177,7 @@ class Layer:
             'VSATN': 3e5,  # Saturation Velocity of Electrons
             'VSATP': 6e5,  # Saturation Velocity of Holes
             'AVb_E':
-                -2.1  #Average Valence Band Energy or the absolute energy level
+                -2.1  # Average Valence Band Energy or the absolute energy level
         }
         # Check alloying radio, and use alloying function
         if self.alloy_ratio < 0 or self.alloy_ratio > 1:
@@ -215,7 +215,8 @@ class Structure1D:
     def __init__(self,
                  layer_list: List[Layer],
                  temp=0.01,
-                 spline_storage=False) -> None:
+                 spline_storage=False,
+                 **kwargs) -> None:
 
         self.layers = layer_list
         # Structure's parameter
@@ -232,7 +233,7 @@ class Structure1D:
         self.cb_meff = None
         self.eps = None
         self.doping = None
-        self._prepare_structure_stroage(spline_storage=spline_storage)
+        self._prepare_structure_stroage(spline_storage=spline_storage, **kwargs)
 
     @abstractproperty
     def universal_grid(self):

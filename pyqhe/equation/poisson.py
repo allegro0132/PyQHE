@@ -13,9 +13,7 @@ class PoissonODE:
             density minus the electron density.
     """
 
-    def __init__(self,
-                 grid: np.ndarray,
-                 charge_density: np.ndarray,
+    def __init__(self, grid: np.ndarray, charge_density: np.ndarray,
                  eps: np.ndarray) -> None:
         self.grid = grid
         self.charge_density = charge_density
@@ -33,11 +31,14 @@ class PoissonODE:
             return sigma * -const.q
 
         sol = solve_ivp(righthand, (self.grid[0], self.grid[-1]), [0],
-                        t_eval=self.grid, **kwargs)
+                        t_eval=self.grid,
+                        **kwargs)
         # divide dielectric `eps`
         self.e_field = sol.y.flatten() / self.eps
         # integral the potential
-        self.v_potential = cumulative_trapezoid(self.e_field, self.grid, initial=0)
+        self.v_potential = cumulative_trapezoid(self.e_field,
+                                                self.grid,
+                                                initial=0)
 
         return self.v_potential
 
@@ -65,9 +66,9 @@ class PoissonFDM:
         F0 = -np.sum(const.q * self.charge_density) / (2.0)
         # is the above necessary since the total field due to the structure should be zero.
         # Do running integral
-        tmp = (
-            np.hstack(([0.0], self.charge_density[:-1])) + self.charge_density
-        )  # using trapezium rule for integration (?).
+        tmp = (np.hstack(
+            ([0.0], self.charge_density[:-1])) + self.charge_density
+              )  # using trapezium rule for integration (?).
         tmp *= (
             const.q / 2.0
         )  # Note: sigma is a number density per unit area, needs to be converted to Couloumb per unit area
@@ -81,6 +82,8 @@ class PoissonFDM:
                                                 initial=0)
 
         return self.v_potential * const.q
+
+
 # %%
 # # QuickTest
 # from matplotlib import pyplot as plt

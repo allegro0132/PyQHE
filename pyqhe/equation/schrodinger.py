@@ -9,10 +9,7 @@ import pyqhe.utility.constant as const
 class SchrodingerShooting:
     """Shooting method solver for calculation Schrodinger equation."""
 
-    def __init__(self,
-                 grid: np.ndarray,
-                 v_potential,
-                 cb_meff) -> None:
+    def __init__(self, grid: np.ndarray, v_potential, cb_meff) -> None:
 
         # Schrodinger equation's parameters
         self.v_potential = v_potential
@@ -21,7 +18,7 @@ class SchrodingerShooting:
         self.grid = grid
         self.delta_z = grid[1] - grid[0]
         # Shooting method parameters for Schrödinger Equation solution
-        # Energy step (meV) for initial search. Initial delta_E is 1 meV.
+        # Energy step (eV) for initial search. Initial delta_E is 1 meV.
         self.delta_e = 0.5 / 1e3
         # Cache parameters
         self.psi = None
@@ -55,7 +52,11 @@ class SchrodingerShooting:
 
         return psi[-1]  # psi at inf
 
-    def calc_evals(self, energy_x0=None, max_energy=None, num_band=None, **kwargs):
+    def calc_evals(self,
+                   energy_x0=None,
+                   max_energy=None,
+                   num_band=None,
+                   **kwargs):
         """Calculate eigenenergy of any bound states in the chosen potential.
 
         Args:
@@ -69,7 +70,7 @@ class SchrodingerShooting:
         if energy_x0 is None:
             energy_x0 = np.min(self.v_potential) * 0.9
         if max_energy is None:
-            max_energy = np.max(self.v_potential) + 0.5 * (
+            max_energy = np.max(self.v_potential) + 0.1 * (
                 np.max(self.v_potential) - np.min(self.v_potential))
         # shooting energy list
         num_shooting = round((max_energy - energy_x0) / self.delta_e)
