@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 
 from pyqhe.core.structure import Layer, Structure1D
 from pyqhe.schrodinger_poisson import SchrodingerPoisson
+from pyqhe.equation.poisson import PoissonODE
 
 # %%
 layer_list = []
@@ -15,9 +16,9 @@ layer_list.append(Layer(5, 0.3, 0.0, name='cladding'))
 layer_list.append(Layer(5, 0.3, 5e17, name='n-type'))
 layer_list.append(Layer(10, 0.3, 0.0, name='barrier'))
 
-model = Structure1D(layer_list, temp=10, dx=0.1)
+model = Structure1D(layer_list, temp=10, dz=0.1)
 # instance of class SchrodingerPoisson
-schpois = SchrodingerPoisson(model)
+schpois = SchrodingerPoisson(model, poisolver=PoissonODE)
 # %%
 # perform self consistent optimization
 res = schpois.self_consistent_minimize()

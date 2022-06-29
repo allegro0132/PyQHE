@@ -268,14 +268,14 @@ class Structure1D:
         return np.linspace(self.bound_locs[0], self.bound_locs[-1],
                            num_gridpoint)
 
-    def _prepare_structure_stroage(self, dx=1, spline_storage=False):
+    def _prepare_structure_stroage(self, dz=1, spline_storage=False):
         """Initialize structure's parameters in `SplineStorage`.
 
         Args:
             dx: the minimum gap between grid point , unit in nanometer.
         """
 
-        num_gridpoint = round(self.stack_thick / dx)
+        num_gridpoint = round(self.stack_thick / dz)
         # Generate a identity grid
         self._universal_grid = self.generate_grid(num_gridpoint)
         eps = np.zeros(self.universal_grid.shape)

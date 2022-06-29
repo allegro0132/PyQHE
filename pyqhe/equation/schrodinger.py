@@ -1,4 +1,5 @@
 # %%
+from abc import ABC, abstractmethod
 import numpy as np
 from scipy import optimize
 import qutip as qt
@@ -6,7 +7,28 @@ import qutip as qt
 import pyqhe.utility.constant as const
 
 
-class SchrodingerShooting:
+class SchrodingerSolver(ABC):
+    """Meta class for Schrodinger equation solver."""
+
+    def __init__(self) -> None:
+        # properties
+        self.grid = None
+        self.v_potential = None
+        self.cb_meff = None
+        # Cache parameters
+        self.psi = None
+
+    @abstractmethod
+    def calc_evals(self):
+        """Calculate eigenenergy of any bound states in the chosen potential."""
+
+    @abstractmethod
+    def calc_esys(self):
+        """Calculate wave function and eigenenergy."""
+
+
+
+class SchrodingerShooting(SchrodingerSolver):
     """Shooting method solver for calculation Schrodinger equation."""
 
     def __init__(self, grid: np.ndarray, v_potential, cb_meff) -> None:
@@ -20,8 +42,6 @@ class SchrodingerShooting:
         # Shooting method parameters for Schrödinger Equation solution
         # Energy step (eV) for initial search. Initial delta_E is 1 meV.
         self.delta_e = 0.5 / 1e3
-        # Cache parameters
-        self.psi = None
 
     def _psi_iteration(self, energy_x0):
         """Use `numpy.nditer` to get iteration solution.

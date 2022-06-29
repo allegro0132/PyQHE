@@ -1,8 +1,8 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from pyqhe.equation.schrodinger import SchrodingerShooting
-from pyqhe.equation.poisson import PoissonODE, PoissonFDM
+from pyqhe.equation.schrodinger import SchrodingerSolver, SchrodingerShooting
+from pyqhe.equation.poisson import PoissonSolver, PoissonODE, PoissonFDM
 from pyqhe.utility.fermi import FermiStatistic
 from pyqhe.core.structure import Structure1D
 
@@ -46,7 +46,12 @@ class OptimizeResult:
                        label=f'E_{i}: {energy:3f}')  # eigenenergy
             # plot rescaled wave function
             ax.plot(self.grid, state * wave_func_rescale + energy, color='b')
-        ax.axhline(self.fermi_energy, 0.1, 0.9, color="r", ls="--")
+        ax.axhline(self.fermi_energy,
+                   0.1,
+                   0.9,
+                   color="r",
+                   ls="--",
+                   label=f'E_fermi: {float(self.fermi_energy):3f}')
         ax.set_xlabel("Position (nm)")
         ax.set_ylabel("Energy (eV)")
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
@@ -63,7 +68,12 @@ class SchrodingerPoisson:
         fermi_util: Use Fermi statistic for Fermi level and energy bands' distribution.
     """
 
-    def __init__(self, model: Structure1D, learning_rate=0.5, **kwargs) -> None:
+    def __init__(self,
+                 model: Structure1D,
+                 schsolver: SchrodingerSolver = SchrodingerShooting,
+                 poisolver: PoissonSolver = PoissonFDM,
+                 learning_rate=0.5,
+                 **kwargs) -> None:
         self.model = model
         # load material's properties
         self.temp = model.temp  # temperature
@@ -76,8 +86,8 @@ class SchrodingerPoisson:
         # adjust optimizer
         self.learning_rate = learning_rate
         # load solver
-        self.sch_solver = SchrodingerShooting(self.grid, self.fi, self.cb_meff)
-        self.poi_solver = PoissonFDM(self.grid, self.doping, self.eps)
+        self.sch_solver = schsolver(self.grid, self.fi, self.cb_meff)
+        self.poi_solver = poisolver(self.grid, self.doping, self.eps)
         self.fermi_util = FermiStatistic(self.grid, self.cb_meff, self.doping)
         # Cache parameters
         self.eig_val = self.sch_solver.calc_evals()

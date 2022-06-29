@@ -1,11 +1,29 @@
-# %%
+from abc import ABC, abstractmethod, abstractproperty
 import numpy as np
 from scipy.integrate import solve_ivp, cumulative_trapezoid
 
 import pyqhe.utility.constant as const
 
 
-class PoissonODE:
+class PoissonSolver(ABC):
+    """Meta-class for Poisson equation solver."""
+
+    def __init__(self) -> None:
+        # properties
+        self.grid = None
+        self.charge_density = None
+        self.eps = None
+        # Cache parameters
+        self.e_field = None
+        self.v_potential = None
+
+    @abstractmethod
+    def calc_poisson(self):
+        """Solve Poisson equation and get related electric field and potential.
+        """
+
+
+class PoissonODE(PoissonSolver):
     """ODE integration solver for 1d Poisson equation.
 
     Args:
@@ -15,12 +33,11 @@ class PoissonODE:
 
     def __init__(self, grid: np.ndarray, charge_density: np.ndarray,
                  eps: np.ndarray) -> None:
+        super().__init__()
+
         self.grid = grid
         self.charge_density = charge_density
         self.eps = eps
-        # Cache parameters
-        self.e_field = None
-        self.v_potential = None
 
     def calc_poisson(self, **kwargs):
         """Calculate electric field."""
@@ -43,7 +60,7 @@ class PoissonODE:
         return self.v_potential
 
 
-class PoissonFDM:
+class PoissonFDM(PoissonSolver):
     """ODE integration solver for 1d Poisson equation.
 
     Args:
@@ -53,12 +70,11 @@ class PoissonFDM:
 
     def __init__(self, grid: np.ndarray, charge_density: np.ndarray,
                  eps: np.ndarray) -> None:
+        super().__init__()
+
         self.grid = grid
         self.charge_density = charge_density
         self.eps = eps
-        # Cache parameters
-        self.e_field = None
-        self.v_potential = None
 
     def calc_poisson(self, **kwargs):
         """Calculate electric field."""
@@ -71,7 +87,9 @@ class PoissonFDM:
               )  # using trapezium rule for integration (?).
         tmp *= (
             const.q / 2.0
-        )  # Note: sigma is a number density per unit area, needs to be converted to Couloumb per unit area
+        )
+        # Note: sigma is a number density per unit area, needs to be converted
+        # to Couloumb per unit area
         tmp[0] = F0
         f = np.cumsum(tmp) / self.eps
 
