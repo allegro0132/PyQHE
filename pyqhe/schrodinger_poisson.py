@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -73,6 +74,7 @@ class SchrodingerPoisson:
                  schsolver: SchrodingerSolver = SchrodingerShooting,
                  poisolver: PoissonSolver = PoissonFDM,
                  learning_rate=0.5,
+                 quantum_region: List[float] = None,
                  **kwargs) -> None:
         self.model = model
         # load material's properties
@@ -83,12 +85,22 @@ class SchrodingerPoisson:
         self.doping = model.doping  # doping profile
         # load grid configure
         self.grid = model.universal_grid
+        # Setup Quantum region
+        if quantum_region is not None and len(quantum_region) == 2:
+            self.quantum_mask = (self.grid > quantum_region[0]) * (
+                self.grid < quantum_region[1])
+        else:
+            self.quantum_mask = (np.ones_like(self.grid) == 1)
         # adjust optimizer
         self.learning_rate = learning_rate
         # load solver
-        self.sch_solver = schsolver(self.grid, self.fi, self.cb_meff)
+        self.sch_solver = schsolver(self.grid[self.quantum_mask],
+                                    self.fi[self.quantum_mask],
+                                    self.cb_meff[self.quantum_mask])
+        self.fermi_util = FermiStatistic(self.grid[self.quantum_mask],
+                                         self.cb_meff[self.quantum_mask],
+                                         self.doping[self.quantum_mask])
         self.poi_solver = poisolver(self.grid, self.doping, self.eps)
-        self.fermi_util = FermiStatistic(self.grid, self.cb_meff, self.doping)
         # Cache parameters
         self.eig_val = self.sch_solver.calc_evals()
         self.params = None
@@ -101,11 +113,14 @@ class SchrodingerPoisson:
         grid_dist = np.append(grid_dist, grid_dist[-1])  # adjust shape
         doping_2d = self.doping * grid_dist
         # Accumulate electron areal density in the subbands
-        elec_density = np.zeros_like(doping_2d)
+        elec_density = np.zeros_like(self.grid[self.quantum_mask])
         for i, distri in enumerate(n_states):
             elec_density += distri * wave_func[i] * np.conj(wave_func[i])
         # Let dopants density minus electron density
-        return doping_2d - elec_density
+        net_density = doping_2d
+        net_density[self.quantum_mask] = doping_2d[self.quantum_mask] - elec_density
+
+        return net_density
 
     def _iteration(self, params):
         """Perform a single iteration of self-consistent Schrodinger-Poisson
@@ -117,7 +132,7 @@ class SchrodingerPoisson:
 
         # perform schrodinger solver
         v_potential = self.fi + params
-        self.sch_solver.v_potential = v_potential
+        self.sch_solver.v_potential = v_potential[self.quantum_mask]
         eig_val, wave_func = self.sch_solver.calc_esys()
         # calculate energy band distribution
         _, n_states = self.fermi_util.fermilevel(eig_val, wave_func, self.temp)
@@ -136,6 +151,7 @@ class SchrodingerPoisson:
     def self_consistent_minimize(self,
                                  num_iter=10,
                                  learning_rate=0.5,
+                                 tol=1e-5,
                                  logging=True):
         """Self consistent optimize parameters `v_potential` to get solution.
 
@@ -144,7 +160,7 @@ class SchrodingerPoisson:
         """
         if self.params is None:
             self.params = 0  # v_potential
-        for _ in range(num_iter):
+        for i, _ in enumerate(range(num_iter)):
             # perform a iteration
             loss, temp_params = self._iteration(self.params)
             if logging:
@@ -152,8 +168,9 @@ class SchrodingerPoisson:
                     f'Loss: {loss}, energy_0: {self.eig_val[0]}, '
                     f'energy_1: {self.eig_val[1]}, energy_2: {self.eig_val[2]}')
             # self-consistent update params
-            # params += learning_rate * temp_params
-            self.params = temp_params
+            self.params += (temp_params - self.params) * learning_rate
+            if i and loss < tol:
+                break
         # save optimize result
         res = OptimizeResult()
         res.params = self.params
@@ -165,8 +182,15 @@ class SchrodingerPoisson:
         res.fermi_energy, res.n_states = self.fermi_util.fermilevel(
             res.eig_val, res.wave_function, self.temp)
         res.sigma = self._calc_net_density(res.n_states, res.wave_function)
+        # full wave function
+        full_wave_function = []
+        for wf in res.wave_function:
+            new_wf = np.zeros_like(self.grid)
+            new_wf[self.quantum_mask] = wf
+            full_wave_function.append(new_wf)
+        res.wave_function = np.asarray(full_wave_function)
         self.poi_solver.charge_density = res.sigma
         self.poi_solver.calc_poisson()
         res.e_field = self.poi_solver.e_field
 
-        return res
+        return res, loss

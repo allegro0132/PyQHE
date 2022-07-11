@@ -27,7 +27,6 @@ class SchrodingerSolver(ABC):
         """Calculate wave function and eigenenergy."""
 
 
-
 class SchrodingerShooting(SchrodingerSolver):
     """Shooting method solver for calculation Schrodinger equation."""
 

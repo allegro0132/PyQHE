@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod, abstractproperty
 import numpy as np
-from scipy.integrate import solve_ivp, cumulative_trapezoid
+from scipy.integrate import odeint, solve_ivp, cumulative_trapezoid
 
 import pyqhe.utility.constant as const
 
@@ -48,9 +48,11 @@ class PoissonODE(PoissonSolver):
             return sigma * -const.q
 
         sol = solve_ivp(righthand, (self.grid[0], self.grid[-1]), [0],
-                        t_eval=self.grid,
+                        t_eval=self.grid,# method='DOP853',
                         **kwargs)
         # divide dielectric `eps`
+        # sol = odeint(righthand, [0], self.grid, tfirst=False)
+        # self.e_field = sol.flatten() / self.eps
         self.e_field = sol.y.flatten() / self.eps
         # integral the potential
         self.v_potential = cumulative_trapezoid(self.e_field,

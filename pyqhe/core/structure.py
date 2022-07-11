@@ -181,7 +181,7 @@ class Layer:
         }
         # Check alloying radio, and use alloying function
         if self.alloy_ratio < 0 or self.alloy_ratio > 1:
-            raise ValueError('Incorrect allot ratio.')
+            raise ValueError('Incorrect alloy ratio.')
         else:
             self._alloying()
 
