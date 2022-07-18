@@ -129,7 +129,8 @@ class SchrodingerShooting(SchrodingerSolver):
         wave_function = []
         for energy in eig_val:
             self._psi_iteration(energy)
-            norm = np.linalg.norm(self.psi)
+            norm = np.sqrt(np.trapz(self.psi * np.conj(self.psi),
+                                    x=self.grid))  # l2-norm
             wave_function.append(self.psi / norm)
 
         return eig_val, np.asarray(wave_function)

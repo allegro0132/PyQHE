@@ -26,6 +26,8 @@ class OptimizeResult:
         # electric field properties
         self.v_potential = None
         self.e_field = None
+        # Accumulate electron density
+        self.electron_density = None
 
     def plot_quantum_well(self):
         """Plot dressed conduction band of quantum well, and electrons'
@@ -108,17 +110,16 @@ class SchrodingerPoisson:
     def _calc_net_density(self, n_states, wave_func):
         """Calculate the net charge density."""
 
-        # firstly, convert to areal charge density
-        grid_dist = np.diff(self.grid)
-        grid_dist = np.append(grid_dist, grid_dist[-1])  # adjust shape
-        doping_2d = self.doping * grid_dist
         # Accumulate electron areal density in the subbands
         elec_density = np.zeros_like(self.grid[self.quantum_mask])
         for i, distri in enumerate(n_states):
             elec_density += distri * wave_func[i] * np.conj(wave_func[i])
+        # normalize by electric neutrality
+        norm = np.trapz(self.doping, self.grid) / np.trapz(
+            elec_density, self.grid)
+        elec_density *= norm
         # Let dopants density minus electron density
-        net_density = doping_2d
-        net_density[self.quantum_mask] = doping_2d[self.quantum_mask] - elec_density
+        net_density = self.doping[self.quantum_mask] - elec_density
 
         return net_density
 
@@ -172,6 +173,8 @@ class SchrodingerPoisson:
             if i and loss < tol:
                 break
         # save optimize result
+        # optimal_index = np.argmin(loss_list[1:])
+        # self.params = param_list[optimal_index]
         res = OptimizeResult()
         res.params = self.params
         res.grid = self.grid
@@ -192,5 +195,10 @@ class SchrodingerPoisson:
         self.poi_solver.charge_density = res.sigma
         self.poi_solver.calc_poisson()
         res.e_field = self.poi_solver.e_field
+        # Accumulate electron areal density in the subbands
+        res.electron_density = np.zeros_like(self.grid[self.quantum_mask])
+        for i, distri in enumerate(res.n_states):
+            res.electron_density += distri * res.wave_function[i] * np.conj(
+                res.wave_function[i])
 
         return res, loss

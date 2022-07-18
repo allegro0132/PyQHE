@@ -42,24 +42,16 @@ class PoissonODE(PoissonSolver):
     def calc_poisson(self, **kwargs):
         """Calculate electric field."""
 
-        def righthand(z, y):
-            # interpolate
-            sigma = np.interp(z, self.grid, self.charge_density)
-            return sigma * -const.q
-
-        sol = solve_ivp(righthand, (self.grid[0], self.grid[-1]), [0],
-                        t_eval=self.grid,# method='DOP853',
-                        **kwargs)
-        # divide dielectric `eps`
-        # sol = odeint(righthand, [0], self.grid, tfirst=False)
-        # self.e_field = sol.flatten() / self.eps
-        self.e_field = sol.y.flatten() / self.eps
+        d_z = cumulative_trapezoid(const.q * self.charge_density,
+                                   self.grid,
+                                   initial=0)
+        self.e_field = d_z / self.eps
         # integral the potential
         self.v_potential = cumulative_trapezoid(self.e_field,
                                                 self.grid,
                                                 initial=0)
 
-        return self.v_potential
+        return self.v_potential * const.q
 
 
 class PoissonFDM(PoissonSolver):
@@ -87,9 +79,7 @@ class PoissonFDM(PoissonSolver):
         tmp = (np.hstack(
             ([0.0], self.charge_density[:-1])) + self.charge_density
               )  # using trapezium rule for integration (?).
-        tmp *= (
-            const.q / 2.0
-        )
+        tmp *= (const.q / 2.0)
         # Note: sigma is a number density per unit area, needs to be converted
         # to Couloumb per unit area
         tmp[0] = F0
