@@ -9,13 +9,13 @@ For more information and introductions, test cases in `pyqhe/pytest` are also in
 The package is purely written in Python.
 
 - Pull the repository
-```python
+```bash
 git pull https://github.com/allegro0132/PyQHE.git
 ```
 
 - PyQHE can be obtained via pip as:
 ```python
-pip install ./pyqhe
+pip install .
 ```
 
 ## Advantages
