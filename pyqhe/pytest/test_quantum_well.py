@@ -48,7 +48,7 @@ def calc_omega(thickness=10, tol=5e-5):
     layer_list.append(Layer(2, 0.24, 5e17, name='n-type'))
     layer_list.append(Layer(20, 0.24, 0.0, name='barrier'))
 
-    model = Structure1D(layer_list, temp=10, dz=0.2)
+    model = Structure1D(layer_list, temp=10, dz=0.1)
     # instance of class SchrodingerPoisson
     schpois = SchrodingerPoisson(
         model,
@@ -111,7 +111,7 @@ def calc_omega(thickness=10, tol=5e-5):
 
 
 # %%
-_, res = calc_omega(50)
+_, res = calc_omega(30)
 res.plot_quantum_well()
 # %%
 thickness_list = np.linspace(10, 65, 20)
@@ -137,4 +137,6 @@ plt.ylabel(r'Geometry thickness $\omega$ (nm)')
 plt.legend()
 # %%
 res_list[15].plot_quantum_well()
+# %%
+plt.plot(res.grid, res.params)
 # %%

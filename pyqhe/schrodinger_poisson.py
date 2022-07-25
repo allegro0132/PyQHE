@@ -141,10 +141,9 @@ class SchrodingerPoisson:
         sigma = self._calc_net_density(n_states, wave_func)
         # perform poisson solver
         self.poi_solver.charge_density = sigma
-        self.poi_solver.calc_poisson()
+        params = self.poi_solver.calc_poisson()
         # return eigenenergy loss
         loss = np.abs(self.eig_val[0] - eig_val[0])
-        params = self.poi_solver.v_potential
         self.eig_val = eig_val
 
         return loss, params

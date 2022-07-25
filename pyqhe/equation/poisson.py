@@ -47,11 +47,12 @@ class PoissonODE(PoissonSolver):
                                    initial=0)
         self.e_field = d_z / self.eps
         # integral the potential
+        # note here we put a electron, dV/dz = E
         self.v_potential = cumulative_trapezoid(self.e_field,
                                                 self.grid,
                                                 initial=0)
 
-        return self.v_potential * const.q
+        return self.v_potential
 
 
 class PoissonFDM(PoissonSolver):
