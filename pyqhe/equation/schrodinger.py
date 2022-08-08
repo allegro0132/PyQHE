@@ -1,6 +1,8 @@
 # %%
 from abc import ABC, abstractmethod
+from typing import List, Optional, Union
 import numpy as np
+import scipy.linalg as sciLA
 from scipy import optimize
 import qutip as qt
 
@@ -136,10 +138,102 @@ class SchrodingerShooting(SchrodingerSolver):
         return eig_val, np.asarray(wave_function)
 
 
+class SchrodingerMatrix(SchrodingerSolver):
+    """N-D Schrodinger equation solver based on discrete Laplacian and FDM.
+
+    Args:
+        grid: ndarray or list of ndarray
+            when solving n-d schrodinger equation, just pass n grid array
+    """
+
+    def __init__(self, grid: Union[List[np.ndarray], np.ndarray],
+                 v_potential: np.ndarray, cb_meff: np.ndarray) -> None:
+        super().__init__()
+
+        if not isinstance(grid, list):  # 1d grid
+            grid = [grid]
+        self.grid = grid
+        self.dim = [grid_axis.shape[0] for grid_axis in self.grid]
+        # check matrix dim
+        if v_potential.shape == tuple(self.dim):
+            self.v_potential = v_potential
+        else:
+            raise ValueError('The dimension of v_potential is not match')
+        if cb_meff.shape == tuple(self.dim):
+            self.cb_meff = cb_meff
+        else:
+            raise ValueError('The dimension of cb_meff is not match.')
+
+    def build_kinetic_operator(self, dim, coeff=1):
+        """Build 1D time independent Schrodinger equation kinetic operator.
+
+        Args:
+            dim: dimension of kinetic operator.
+        """
+        mat_d = -2 * np.eye(dim) + np.eye(dim, k=-1) + np.eye(dim, k=1)
+        return coeff * mat_d
+
+    def build_potential_operator(self, dim, coeff=1):
+        """Build 1D time independent Schrodinger equation potential operator.
+
+        Args:
+            dim: dimension of potential operator.
+        """
+        return coeff * np.eye(dim)
+
+    def hamiltonian(self):
+        """Construct time independent Schrodinger equation."""
+        # construct V and cb_meff matrix
+        # discrete laplacian
+        k_mat_list = []
+        for i, dim in enumerate(self.dim):
+            mat = self.build_kinetic_operator(dim)
+            kron_list = [np.eye(idim) for idim in self.dim[:i]] + [mat] + [
+                np.eye(idim) for idim in self.dim[i + 1:]
+            ] + [1]  # auxiliary element for 1d solver
+            k_mat_list.append(np.kron(*kron_list))
+        k_mat = -0.5 * np.sum(k_mat_list, axis=0)
+        v_mat = np.diag(self.v_potential.flatten())
+
+        return k_mat + v_mat
+
+    def calc_evals(self):
+        ham = self.hamiltonian()
+        return sciLA.eigh(ham, eigvals_only=True)
+
+    def calc_esys(self):
+        ham = self.hamiltonian()
+        eig_val, eig_vec = sciLA.eigh(ham)
+        # reshape eigenvector to discrete wave function
+        wave_func = [vec.reshape(self.dim) for vec in eig_vec.T]
+
+        return eig_val, wave_func
+
+
 # %%
 # # QuickTest
-# from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
+from matplotlib import cm
 
+x_barrier = (xv <= -0.5) + (xv >= 0.5)
+y_barrier = (yv <= -0.5) + (yv >= 0.5)
+self.v_potential = np.zeros(self.dim)
+self.v_potential[x_barrier + y_barrier] = 10  # set barrier
+sol = SchrodingerMatrix()
+
+eig_val, wf = sol.calc_esys()
+# %%
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+xv, yv = np.meshgrid(*sol.grid)
+surf = ax.plot_surface(xv,
+                       yv,
+                       np.abs(wf[6]),
+                       cmap=cm.coolwarm,
+                       linewidth=0,
+                       antialiased=False)
+
+plt.show()
+# %%
 # grid = np.linspace(0, 10, 100)
 # psi = np.zeros(grid.shape)
 # v_potential = np.ones(grid.shape) * 10
