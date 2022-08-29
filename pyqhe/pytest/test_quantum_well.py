@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from pyqhe.core.structure import Layer, Structure1D
 from pyqhe.schrodinger_poisson import SchrodingerPoisson
 from pyqhe.equation.poisson import PoissonFDM, PoissonODE
+from pyqhe.equation.schrodinger import SchrodingerMatrix
 
 # map between effective layer thickness and quantum well width
 stick_nm = [20, 30, 40, 45, 50, 60, 70, 80]
@@ -52,9 +53,11 @@ def calc_omega(thickness=10, tol=5e-5):
     # instance of class SchrodingerPoisson
     schpois = SchrodingerPoisson(
         model,
+        schsolver=SchrodingerMatrix,
         poisolver=PoissonODE,
         # quantum_region=(255 - 20, 255 + thickness + 30),
     )
+    # test = schpois.sch_solver.calc_evals()
     # perform self consistent optimization
     res, loss = schpois.self_consistent_minimize(tol=tol)
     if loss > tol:

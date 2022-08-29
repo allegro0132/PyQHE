@@ -7,6 +7,7 @@ from scipy import optimize
 import qutip as qt
 
 import pyqhe.utility.constant as const
+from pyqhe.utility.utils import tensor
 
 
 class SchrodingerSolver(ABC):
@@ -155,44 +156,56 @@ class SchrodingerMatrix(SchrodingerSolver):
         self.grid = grid
         self.dim = [grid_axis.shape[0] for grid_axis in self.grid]
         # check matrix dim
-        if v_potential.shape == tuple(self.dim):
+        if v_potential.shape == tuple(self.dim) or len(self.dim) == 1:
             self.v_potential = v_potential
         else:
             raise ValueError('The dimension of v_potential is not match')
-        if cb_meff.shape == tuple(self.dim):
+        if cb_meff.shape == tuple(self.dim) or len(self.dim) == 1:
             self.cb_meff = cb_meff
         else:
             raise ValueError('The dimension of cb_meff is not match.')
+        self.beta = 1e30
 
-    def build_kinetic_operator(self, dim, coeff=1):
+    def build_kinetic_operator(self, loc):
         """Build 1D time independent Schrodinger equation kinetic operator.
 
         Args:
             dim: dimension of kinetic operator.
         """
-        mat_d = -2 * np.eye(dim) + np.eye(dim, k=-1) + np.eye(dim, k=1)
-        return coeff * mat_d
+        mat_d = -2 * np.eye(self.dim[loc]) + np.eye(
+            self.dim[loc], k=-1) + np.eye(self.dim[loc], k=1)
+        return mat_d
 
-    def build_potential_operator(self, dim, coeff=1):
+    def build_potential_operator(self, loc):
         """Build 1D time independent Schrodinger equation potential operator.
 
         Args:
             dim: dimension of potential operator.
         """
-        return coeff * np.eye(dim)
+        return np.diag(self.v_potential.flatten())
 
     def hamiltonian(self):
         """Construct time independent Schrodinger equation."""
         # construct V and cb_meff matrix
         # discrete laplacian
         k_mat_list = []
-        for i, dim in enumerate(self.dim):
-            mat = self.build_kinetic_operator(dim)
-            kron_list = [np.eye(idim) for idim in self.dim[:i]] + [mat] + [
-                np.eye(idim) for idim in self.dim[i + 1:]
+        for loc, dim in enumerate(self.dim):
+            mat = self.build_kinetic_operator(loc)
+            kron_list = [np.eye(idim) for idim in self.dim[:loc]] + [mat] + [
+                np.eye(idim) for idim in self.dim[loc + 1:]
             ] + [1]  # auxiliary element for 1d solver
-            k_mat_list.append(np.kron(*kron_list))
-        k_mat = -0.5 * np.sum(k_mat_list, axis=0)
+            delta = self.grid[loc][1] - self.grid[loc][0]
+            coeff = -0.5 * const.hbar**2 * self.cb_meff * self.beta**2 / delta**2
+            # coeff = -0.5 * const.hbar**2 / self.cb_meff / delta**2
+            # construct n-d kinetic operator by tensor product
+            k_opt = tensor(*kron_list)
+            # tensor contraction
+            k_opt = np.einsum(k_opt.reshape(self.dim * 2),
+                              np.arange(len(self.dim * 2)), coeff,
+                              np.arange(len(self.dim)),
+                              np.arange(len(self.dim * 2)))
+            k_mat_list.append(k_opt.reshape(np.prod(self.dim), np.prod(self.dim)))
+        k_mat = np.sum(k_mat_list, axis=0)
         v_mat = np.diag(self.v_potential.flatten())
 
         return k_mat + v_mat
@@ -204,45 +217,61 @@ class SchrodingerMatrix(SchrodingerSolver):
     def calc_esys(self):
         ham = self.hamiltonian()
         eig_val, eig_vec = sciLA.eigh(ham)
-        # reshape eigenvector to discrete wave function
-        wave_func = [vec.reshape(self.dim) for vec in eig_vec.T]
+        # convert psi(phi) to psi(z)
+        coeff = 1 / self.cb_meff / self.beta
+        eig_vec = np.einsum(eig_vec.reshape(self.dim * 2),
+                            np.arange(len(self.dim * 2)), coeff,
+                            np.arange(len(self.dim)),
+                            np.arange(len(self.dim * 2)))
+        eig_vec = eig_vec.reshape(np.prod(self.dim), np.prod(self.dim))
+        # eig_vec = np.einsum('ij,i->ij', eig_vec, 1 / self.cb_meff / self.beta)
+        wave_func = []
+        for vec in eig_vec.T:
+            # reshape eigenvector to discrete wave function
+            vec = vec.reshape(self.dim)
+            # normalize
+            norm = vec * np.conj(vec)
+            for grid in self.grid[::-1]:
+                norm = np.trapz(norm, grid)
+            wave_func.append(vec / np.sqrt(norm))
 
-        return eig_val, wave_func
+        return eig_val, np.array(wave_func)
 
 
 # %%
-# # QuickTest
-from matplotlib import pyplot as plt
-from matplotlib import cm
+# QuickTest
+if __name__ == '__main__':
+    from matplotlib import pyplot as plt
+    from matplotlib import cm
 
-x_barrier = (xv <= -0.5) + (xv >= 0.5)
-y_barrier = (yv <= -0.5) + (yv >= 0.5)
-self.v_potential = np.zeros(self.dim)
-self.v_potential[x_barrier + y_barrier] = 10  # set barrier
-sol = SchrodingerMatrix()
+    x = np.linspace(-1, 1, 50)
+    y = np.linspace(-1, 1, 55)
+    xv, yv = np.meshgrid(x, y, indexing='ij')
+    x_barrier = (xv <= -0.5) + (xv >= 0.5)
+    y_barrier = (yv <= -0.5) + (yv >= 0.5)
+    v_potential = np.zeros([50, 55])
+    v_potential[x_barrier + y_barrier] = 1  # set barrier
+    sol = SchrodingerMatrix([x, y], v_potential, np.ones_like(v_potential) * const.m_e)
+    eig_val, wf = sol.calc_esys()
+    # %%
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    surf = ax.plot_surface(xv,
+                           yv,
+                           wf[3],
+                           cmap=cm.coolwarm,
+                           linewidth=0,
+                           antialiased=False)
 
-eig_val, wf = sol.calc_esys()
+    plt.show()
+    # %%
+    grid = np.linspace(0, 10, 100)
+    psi = np.zeros(grid.shape)
+    v_potential = np.ones(grid.shape)
+    # Quantum well
+    v_potential[40:61] = 0
+    cb_meff = np.ones(grid.shape) * const.m_e
+    solver = SchrodingerMatrix(grid, v_potential, cb_meff)
+    val, vec = solver.calc_esys()
+    plt.plot(solver.grid[0], solver.v_potential)
+    plt.plot(solver.grid[0], vec[:3].T)
 # %%
-fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-xv, yv = np.meshgrid(*sol.grid)
-surf = ax.plot_surface(xv,
-                       yv,
-                       np.abs(wf[6]),
-                       cmap=cm.coolwarm,
-                       linewidth=0,
-                       antialiased=False)
-
-plt.show()
-# %%
-# grid = np.linspace(0, 10, 100)
-# psi = np.zeros(grid.shape)
-# v_potential = np.ones(grid.shape) * 10
-# # Quantum well
-# v_potential[40:61] = 0
-# cb_meff = np.ones(grid.shape)
-# energy = 1
-# solver = SchrodingerShooting(grid, psi, energy, v_potential, cb_meff)
-# eig_v = solver.calc_evals(0)
-# # %%
-# plt.plot(solver.grid, solver.v_potential / 10)
-# plt.plot(solver.grid, np.asarray([solver.calc_wavefunction(eig_v[i]) for i in range(3)]).T)
