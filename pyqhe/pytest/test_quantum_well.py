@@ -54,7 +54,7 @@ def calc_omega(thickness=10, tol=5e-5):
     schpois = SchrodingerPoisson(
         model,
         schsolver=SchrodingerMatrix,
-        poisolver=PoissonODE,
+        poisolver=PoissonFDM,
         # quantum_region=(255 - 20, 255 + thickness + 30),
     )
     # test = schpois.sch_solver.calc_evals()
@@ -117,7 +117,7 @@ def calc_omega(thickness=10, tol=5e-5):
 _, res = calc_omega(30)
 res.plot_quantum_well()
 # %%
-thickness_list = np.linspace(10, 65, 20)
+thickness_list = np.linspace(10, 80, 30)
 res_list = []
 omega_list = []
 for thick in thickness_list:

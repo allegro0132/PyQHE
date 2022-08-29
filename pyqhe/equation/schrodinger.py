@@ -4,7 +4,6 @@ from typing import List, Optional, Union
 import numpy as np
 import scipy.linalg as sciLA
 from scipy import optimize
-import qutip as qt
 
 import pyqhe.utility.constant as const
 from pyqhe.utility.utils import tensor
@@ -164,7 +163,7 @@ class SchrodingerMatrix(SchrodingerSolver):
             self.cb_meff = cb_meff
         else:
             raise ValueError('The dimension of cb_meff is not match.')
-        self.beta = 1e30
+        self.beta = 1e31
 
     def build_kinetic_operator(self, loc):
         """Build 1D time independent Schrodinger equation kinetic operator.
@@ -195,8 +194,8 @@ class SchrodingerMatrix(SchrodingerSolver):
                 np.eye(idim) for idim in self.dim[loc + 1:]
             ] + [1]  # auxiliary element for 1d solver
             delta = self.grid[loc][1] - self.grid[loc][0]
-            coeff = -0.5 * const.hbar**2 * self.cb_meff * self.beta**2 / delta**2
-            # coeff = -0.5 * const.hbar**2 / self.cb_meff / delta**2
+            # coeff = -0.5 * const.hbar**2 * self.cb_meff * self.beta**2 / delta**2
+            coeff = -0.5 * const.hbar**2 / self.cb_meff / delta**2
             # construct n-d kinetic operator by tensor product
             k_opt = tensor(*kron_list)
             # tensor contraction
@@ -218,11 +217,11 @@ class SchrodingerMatrix(SchrodingerSolver):
         ham = self.hamiltonian()
         eig_val, eig_vec = sciLA.eigh(ham)
         # convert psi(phi) to psi(z)
-        coeff = 1 / self.cb_meff / self.beta
-        eig_vec = np.einsum(eig_vec.reshape(self.dim * 2),
-                            np.arange(len(self.dim * 2)), coeff,
-                            np.arange(len(self.dim)),
-                            np.arange(len(self.dim * 2)))
+        # coeff = 1 / self.cb_meff / self.beta
+        # eig_vec = np.einsum(eig_vec.reshape(self.dim * 2),
+        #                     np.arange(len(self.dim * 2)), coeff,
+        #                     np.arange(len(self.dim)),
+        #                     np.arange(len(self.dim * 2)))
         eig_vec = eig_vec.reshape(np.prod(self.dim), np.prod(self.dim))
         # eig_vec = np.einsum('ij,i->ij', eig_vec, 1 / self.cb_meff / self.beta)
         wave_func = []
@@ -274,4 +273,5 @@ if __name__ == '__main__':
     val, vec = solver.calc_esys()
     plt.plot(solver.grid[0], solver.v_potential)
     plt.plot(solver.grid[0], vec[:3].T)
+    plt.show()
 # %%
