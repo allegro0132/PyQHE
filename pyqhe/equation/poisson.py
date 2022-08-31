@@ -65,8 +65,11 @@ class PoissonFDM(PoissonSolver):
             density minus the electron density.
     """
 
-    def __init__(self, grid: np.ndarray, charge_density: np.ndarray,
-                 eps: np.ndarray) -> None:
+    def __init__(self,
+                 grid: np.ndarray,
+                 charge_density: np.ndarray,
+                 eps: np.ndarray,
+                 bound_dirichlet: np.ndarray = None) -> None:
         super().__init__()
 
         if not isinstance(grid, list):  # 1d grid
@@ -77,11 +80,12 @@ class PoissonFDM(PoissonSolver):
         if charge_density.shape == tuple(self.dim) or len(self.dim) == 1:
             self.charge_density = charge_density
         else:
-            raise ValueError('The dimension of v_potential is not match')
+            raise ValueError('The dimension of charge_density is not match')
         if eps.shape == tuple(self.dim) or len(self.dim) == 1:
             self.eps = eps
         else:
-            raise ValueError('The dimension of cb_meff is not match.')
+            raise ValueError('The dimension of eps is not match.')
+        self.bound_dirichlet = bound_dirichlet
 
     def build_d_matrix(self, loc):
         """Build 1D time independent Schrodinger equation kinetic operator.
@@ -98,7 +102,8 @@ class PoissonFDM(PoissonSolver):
 
         # discrete laplacian
         a_mat_list = []
-        for loc, dim in enumerate(self.dim):
+
+        for loc, _ in enumerate(self.dim):
             mat = self.build_d_matrix(loc)
             kron_list = [np.eye(idim) for idim in self.dim[:loc]] + [mat] + [
                 np.eye(idim) for idim in self.dim[loc + 1:]
@@ -115,6 +120,18 @@ class PoissonFDM(PoissonSolver):
                 d_opt.reshape(np.prod(self.dim), np.prod(self.dim)))
         a_mat = np.sum(a_mat_list, axis=0)
         b_vec = const.q * self.charge_density.flatten()
+
+        if self.bound_dirichlet is not None:
+            delta = self.grid[0][1] - self.grid[0][0]
+            bound_b = self.bound_dirichlet * self.eps / delta**2
+            bound_a = np.zeros_like(b_vec)
+            bound_loc = np.flatnonzero(self.bound_dirichlet)
+            bound_a[bound_loc] = self.eps.flatten()[bound_loc] / delta**2
+            # tensor contraction
+            bound_mat = np.diag(bound_a)
+            a_mat[bound_loc] = bound_mat[bound_loc]
+            b_vec[bound_loc] = bound_b.flatten()[bound_loc]
+
         self.v_potential = solve(a_mat, b_vec).reshape(self.dim)
         # calculate gradient of potential
         self.e_field = np.gradient(self.v_potential)
@@ -138,20 +155,24 @@ if __name__ == '__main__':
     plt.show()
     plt.plot(grid, sol.e_field)
     # %%
-    x = np.linspace(-1, 1, 50)
-    y = np.linspace(-1, 1, 55)
+    delta = 0.02
+    x = np.arange(-1, 1, delta)
+    y = np.arange(-0.5, 0.5, delta)
     xv, yv = np.meshgrid(x, y, indexing='ij')
-    top_plate = (yv <= 0.55) * (yv >= 0.5)
-    bottom_plate = (yv <= -0.5) * (yv >= -0.55)
-    length = (xv <= 0.7) * (xv >= -0.7)
-    charge = np.zeros([50, 55])
-    charge[top_plate * length] = 1
-    charge[bottom_plate * length] = -1
-    sol = PoissonFDM([x, y], charge, np.ones_like(charge) * const.eps0)
+    top_plate = (yv <= 0.1 + delta / 2) * (yv >= 0.1 - delta / 2)
+    bottom_plate = (yv <= -0.1 + delta /2) * (yv >= -0.1 -delta / 2)
+    length = (xv <= 0.5) * (xv >= -0.5)
+    bound = np.zeros_like(xv)
+    bound[top_plate * length] = 1
+    bound[bottom_plate * length] = -1
+    sol = PoissonFDM([x, y], np.zeros_like(bound),
+                     np.ones_like(bound) * const.eps0, bound)
+    # sol = PoissonFDM([x, y], bound * 10,
+    #                   np.ones_like(bound) * const.eps0)
     v_p = sol.calc_poisson()
     # v potential
     plt.pcolormesh(xv, yv, v_p)
     plt.show()
     # e field
-    plt.pcolormesh(xv, yv, -sol.e_field[1])
+    plt.pcolormesh(xv, yv, np.sqrt(sol.e_field[0]**2 +  sol.e_field[1]**2))
 # %%
