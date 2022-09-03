@@ -4,15 +4,6 @@ from scipy import optimize
 import pyqhe.utility.constant as const
 
 
-def calc_meff_state(grid, wave_function: np.ndarray, cb_meff: np.ndarray):
-    """Calculate subband(specific energy levels) effective mass."""
-    meff_state = wave_function * np.conj(wave_function) * cb_meff
-    for grd in grid[::1]:
-        meff_state = np.trapz(meff_state, x=grd)
-
-    return meff_state / (const.hbar**2 * np.pi)
-
-
 class FermiStatistic:
     """Class for Fermi-Dirac statistic and Fermi level.
 
@@ -42,16 +33,14 @@ class FermiStatistic:
         else:
             raise ValueError('The dimension of doping is not match')
 
-        # Calculate 2d doping density
-        # integrate 3-d density along axis z
-        # in discrete method, just sum over r'n_3d[i] * (grid[i + 1] - grid[i])'
         self.max_occupation = doping
         for grid in self.grid[::-1]:
             self.max_occupation = np.trapz(self.max_occupation, grid)
+
         # Cache parameters
         self.fermi_energy = None
         self.n_states = None
-        self.meff_state = None
+        self.rho_list = None
 
     def integral_fermi_dirac(self, energy, fermi_energy, temp):
         """integral of Fermi Dirac Equation for energy independent density of states.
@@ -62,16 +51,19 @@ class FermiStatistic:
 
     def fermilevel_0k(self, eig_val, wave_function):
         """Calculate Fermi level at 0 K."""
-
-        self.meff_state = calc_meff_state(self.grid, wave_function,
-                                          self.cb_meff)
+        # Calculate subband(specific energy levels) effective mass.
+        meff_state = wave_function * np.conj(wave_function) * self.cb_meff
+        for grid in self.grid[::1]:
+            meff_state = np.trapz(meff_state, x=grid)
+        # calculate density of 2d electron gas
+        self.rho_list = meff_state / (const.hbar**2 * np.pi)
         # list all fermi energy candidate
         estimate_fermi_energy = []
         for i, _ in enumerate(eig_val):
             accumulate_energy = np.sum(eig_val[:i + 1])
             estimate_fermi_energy.append(
-                (self.max_occupation / self.meff_state[i] + accumulate_energy) /
-                (i + 1))
+                (self.max_occupation / self.rho_list[i] + accumulate_energy) /
+                (i + 1))  # for 2des rho(e) related to e
         estimate_fermi_energy = np.array(estimate_fermi_energy)
         # check true Fermi energy
         fermi_idx = np.argwhere((estimate_fermi_energy - eig_val) < 0)
@@ -83,7 +75,7 @@ class FermiStatistic:
         # Calculate populations of energy levels.
         n_state = []
         for i, eig_v in enumerate(eig_val):
-            n_sqrt = (fermi_energy - eig_v) * self.meff_state[i]
+            n_sqrt = (fermi_energy - eig_v) * self.rho_list[i]
             if n_sqrt < 0:
                 n_sqrt = 0
             n_state.append(n_sqrt**2)
@@ -97,7 +89,7 @@ class FermiStatistic:
         def func(f_energy):
             dist = [
                 csb_meff * self.integral_fermi_dirac(eig_v, f_energy, temp)
-                for eig_v, csb_meff in zip(eig_val, self.meff_state)
+                for eig_v, csb_meff in zip(eig_val, self.rho_list)
             ]
             return self.max_occupation - np.sum(dist)
 
@@ -110,7 +102,7 @@ class FermiStatistic:
 
         self.n_states = [
             self.integral_fermi_dirac(energy, self.fermi_energy, temp) *
-            csb_meff for energy, csb_meff in zip(eig_val, self.meff_state)
+            csb_meff for energy, csb_meff in zip(eig_val, self.rho_list)
         ]
 
         return self.fermi_energy, self.n_states
