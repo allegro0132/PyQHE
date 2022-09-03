@@ -3,8 +3,9 @@ import numpy as np
 from scipy import optimize
 from scipy.stats import norm
 from matplotlib import pyplot as plt
+from matplotlib import cm
 
-from pyqhe.core.structure import Layer, Structure1D
+from pyqhe.core.structure import Layer, Structure1D, Structure2D
 from pyqhe.schrodinger_poisson import SchrodingerPoisson
 from pyqhe.equation.poisson import PoissonFDM, PoissonODE
 from pyqhe.equation.schrodinger import SchrodingerMatrix
@@ -49,7 +50,7 @@ def calc_omega(thickness=10, tol=5e-5):
     layer_list.append(Layer(2, 0.24, 5e17, name='n-type'))
     layer_list.append(Layer(20, 0.24, 0.0, name='barrier'))
 
-    model = Structure1D(layer_list, temp=10, dz=0.1)
+    model = Structure2D(layer_list, width=50, temp=10, delta=1)
     # instance of class SchrodingerPoisson
     schpois = SchrodingerPoisson(
         model,
@@ -63,59 +64,78 @@ def calc_omega(thickness=10, tol=5e-5):
     if loss > tol:
         res, loss = schpois.self_consistent_minimize(tol=tol)
     # plot 2DES areal electron density
-    plt.plot(res.grid[0], res.sigma * thickness * 1e14)
+    xv, yv = np.meshgrid(*schpois.grid, indexing='ij')
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    surf = ax.plot_surface(xv,
+                           yv,
+                           res.sigma * thickness * 1e14,
+                           cmap=cm.coolwarm,
+                           linewidth=0,
+                           antialiased=False)
     plt.show()
 
-    # fit a normal distribution to the data
-    def gaussian(x, amplitude, mean, stddev):
-        return amplitude * np.exp(-(x - mean)**2 / 2 / stddev**2)
+    # # fit a normal distribution to the data
+    # def gaussian(x, amplitude, mean, stddev):
+    #     return amplitude * np.exp(-(x - mean)**2 / 2 / stddev**2)
 
-    popt, _ = optimize.curve_fit(gaussian,
-                                 res.grid[0],
-                                 res.electron_density,
-                                 p0=[1, np.mean(res.grid[0]), 10])
-    wf2 = res.wave_function[0] * np.conj(
-        res.wave_function[0])  # only ground state
-    symmetry_axis = popt[1]
-    # calculate standard deviation
-    # the standard deviation of the charge distribution from its center, from PRL, 127, 056801 (2021)
-    charge_distribution = res.electron_density / np.trapz(
-        res.electron_density, res.grid[0])
-    sigma = np.sqrt(
-        np.trapz(charge_distribution * (res.grid[0] - symmetry_axis)**2, res.grid[0]))
-    plt.plot(res.grid[0],
-             wf2,
-             label=r'$|\Psi(z)|^2$')
-    plt.plot(res.grid[0],
-             charge_distribution,
-             label='Charge distribution',
-             color='r')
-    plt.axvline(symmetry_axis - sigma, ls='--', color='y')
-    plt.axvline(symmetry_axis + sigma, ls='--', color='y')
-    plt.xlabel('Position (nm)')
-    plt.ylabel('Distribution')
-    plt.legend()
-    plt.show()
-    # plot factor_q verses q
-    q_list = np.linspace(0, 1, 20)
-    f_fh = []
-    f_self = []
-    for q in q_list:
-        f_fh.append(factor_q_fh(thickness, q))
-        f_self.append(factor_q(res.grid[0], res.wave_function[0], q))
-    plt.plot(q_list, f_fh, label='the Fang-Howard wave function')
-    plt.plot(q_list, f_self, label='self-consistent wave function', color='r')
-    plt.legend()
-    plt.xlabel('wave vector q')
-    plt.ylabel(r'$F(q)$')
-    plt.show()
+    # popt, _ = optimize.curve_fit(gaussian,
+    #                              res.grid,
+    #                              res.electron_density,
+    #                              p0=[1, np.mean(res.grid), 10])
+    # wf2 = res.wave_function[0] * np.conj(
+    #     res.wave_function[0])  # only ground state
+    # symmetry_axis = popt[1]
+    # # calculate standard deviation
+    # # the standard deviation of the charge distribution from its center, from PRL, 127, 056801 (2021)
+    # charge_distribution = res.electron_density / np.trapz(
+    #     res.electron_density, res.grid)
+    # sigma = np.sqrt(
+    #     np.trapz(charge_distribution * (res.grid - symmetry_axis)**2, res.grid))
+    # plt.plot(res.grid,
+    #          wf2,
+    #          label=r'$|\Psi(z)|^2$')
+    # plt.plot(res.grid,
+    #          charge_distribution,
+    #          label='Charge distribution',
+    #          color='r')
+    # plt.axvline(symmetry_axis - sigma, ls='--', color='y')
+    # plt.axvline(symmetry_axis + sigma, ls='--', color='y')
+    # plt.xlabel('Position (nm)')
+    # plt.ylabel('Distribution')
+    # plt.legend()
+    # plt.show()
+    # # plot factor_q verses q
+    # q_list = np.linspace(0, 1, 20)
+    # f_fh = []
+    # f_self = []
+    # for q in q_list:
+    #     f_fh.append(factor_q_fh(thickness, q))
+    #     f_self.append(factor_q(res.grid, res.wave_function[0], q))
+    # plt.plot(q_list, f_fh, label='the Fang-Howard wave function')
+    # plt.plot(q_list, f_self, label='self-consistent wave function', color='r')
+    # plt.legend()
+    # plt.xlabel('wave vector q')
+    # plt.ylabel(r'$F(q)$')
+    # plt.show()
 
-    return sigma, res
+    return res
 
 
 # %%
-_, res = calc_omega(30)
-res.plot_quantum_well()
+res = calc_omega(30)
+# res.plot_quantum_well()
+# %%
+xv, yv = np.meshgrid(*res.grid, indexing='ij')
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+surf = ax.plot_surface(xv,
+                       yv,
+                       res.electron_density,
+                       cmap=cm.coolwarm,
+                       linewidth=0,
+                       antialiased=False)
+# ax.view_init(0, 90)
+# %%
+plt.plot(res.grid[1], res.sigma[25] * 30 * 1e14)
 # %%
 thickness_list = np.linspace(10, 80, 30)
 res_list = []
@@ -141,5 +161,5 @@ plt.legend()
 # %%
 res_list[-1].plot_quantum_well()
 # %%
-plt.plot(res.grid[0], res.params)
+plt.plot(res.grid, res.params)
 # %%

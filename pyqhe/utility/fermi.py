@@ -53,7 +53,7 @@ class FermiStatistic:
         """Calculate Fermi level at 0 K."""
         # Calculate subband(specific energy levels) effective mass.
         meff_state = wave_function * np.conj(wave_function) * self.cb_meff
-        for grid in self.grid[::1]:
+        for grid in self.grid[::-1]:
             meff_state = np.trapz(meff_state, x=grid)
         # calculate density of 2d electron gas
         self.rho_list = meff_state / (const.hbar**2 * np.pi)

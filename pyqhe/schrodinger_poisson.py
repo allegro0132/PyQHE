@@ -36,7 +36,7 @@ class OptimizeResult:
 
         wave_func_rescale = 0.2
         ax = plt.subplot(1, 1, 1)
-        ax.plot(self.grid, self.v_potential, "k")
+        ax.plot(self.grid[0], self.v_potential, "k")
         # just plot the three lowest eigenenergy
         colors = ['y', 'c', 'm']
         for i, (energy, state) in enumerate(
@@ -48,7 +48,7 @@ class OptimizeResult:
                        color=colors[i],
                        label=f'E_{i}: {energy:3f}')  # eigenenergy
             # plot rescaled wave function
-            ax.plot(self.grid, state * wave_func_rescale + energy, color='b')
+            ax.plot(self.grid[0], state * wave_func_rescale + energy, color='b')
         ax.axhline(self.fermi_energy,
                    0.1,
                    0.9,
@@ -88,21 +88,25 @@ class SchrodingerPoisson:
         # load grid configure
         self.grid = model.universal_grid
         # Setup Quantum region
-        if quantum_region is not None and len(quantum_region) == 2:
-            self.quantum_mask = (self.grid > quantum_region[0]) * (
-                self.grid < quantum_region[1])
-        else:
-            self.quantum_mask = (np.ones_like(self.grid) == 1)
+        # if quantum_region is not None and len(quantum_region) == 2:
+        #     self.quantum_mask = (self.grid > quantum_region[0]) * (
+        #         self.grid < quantum_region[1])
+        # else:
+        #     self.quantum_mask = (np.ones_like(self.grid) == 1)
         # adjust optimizer
         self.learning_rate = learning_rate
         # load solver
-        self.sch_solver = schsolver(self.grid[self.quantum_mask],
-                                    self.fi[self.quantum_mask],
-                                    self.cb_meff[self.quantum_mask])
-        self.fermi_util = FermiStatistic(self.grid[self.quantum_mask],
-                                         self.cb_meff[self.quantum_mask],
-                                         self.doping[self.quantum_mask])
+        self.sch_solver = schsolver(self.grid,
+                                    self.fi,
+                                    self.cb_meff)
+        self.fermi_util = FermiStatistic(self.grid,
+                                         self.cb_meff,
+                                         self.doping)
         self.poi_solver = poisolver(self.grid, self.doping, self.eps)
+        # accumulate charge density
+        self.accumulate_q = self.doping
+        for grid in self.grid[::-1]:
+            self.accumulate_q = np.trapz(self.accumulate_q, x=grid)
         # Cache parameters
         self.eig_val = self.sch_solver.calc_evals()
         self.params = None
@@ -110,16 +114,17 @@ class SchrodingerPoisson:
     def _calc_net_density(self, n_states, wave_func):
         """Calculate the net charge density."""
 
-        # Accumulate electron areal density in the subbands
-        elec_density = np.zeros_like(self.grid[self.quantum_mask])
+        elec_density = np.zeros_like(self.doping)
         for i, distri in enumerate(n_states):
             elec_density += distri * wave_func[i] * np.conj(wave_func[i])
         # normalize by electric neutrality
-        norm = np.trapz(self.doping, self.grid) / np.trapz(
-            elec_density, self.grid)
+        accumu_elec = elec_density.copy()
+        for grid in self.grid[::-1]:
+            accumu_elec = np.trapz(accumu_elec, x=grid)
+        norm = self.accumulate_q / accumu_elec
         elec_density *= norm
         # Let dopants density minus electron density
-        net_density = self.doping[self.quantum_mask] - elec_density
+        net_density = self.doping - elec_density
 
         return net_density
 
@@ -133,7 +138,7 @@ class SchrodingerPoisson:
 
         # perform schrodinger solver
         v_potential = self.fi + params
-        self.sch_solver.v_potential = v_potential[self.quantum_mask]
+        self.sch_solver.v_potential = v_potential
         eig_val, wave_func = self.sch_solver.calc_esys()
         # calculate energy band distribution
         _, n_states = self.fermi_util.fermilevel(eig_val, wave_func, self.temp)
@@ -187,15 +192,14 @@ class SchrodingerPoisson:
         # full wave function
         full_wave_function = []
         for wf in res.wave_function:
-            new_wf = np.zeros_like(self.grid)
-            new_wf[self.quantum_mask] = wf
+            new_wf = wf
             full_wave_function.append(new_wf)
         res.wave_function = np.asarray(full_wave_function)
         self.poi_solver.charge_density = res.sigma
         self.poi_solver.calc_poisson()
         res.e_field = self.poi_solver.e_field
         # Accumulate electron areal density in the subbands
-        res.electron_density = np.zeros_like(self.grid[self.quantum_mask])
+        res.electron_density = np.zeros_like(self.doping)
         for i, distri in enumerate(res.n_states):
             res.electron_density += distri * res.wave_function[i] * np.conj(
                 res.wave_function[i])

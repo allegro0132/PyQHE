@@ -2,7 +2,6 @@ from abc import abstractmethod, ABC, abstractproperty
 from typing import List
 import numpy as np
 from scipy.interpolate import interp1d, CubicSpline
-import qutip
 
 import pyqhe.utility.constant as const
 
@@ -118,7 +117,8 @@ class Layer:
         }
 
         self.AlAs = {
-            'm_e': 0.15,
+            # 'm_e': 0.15,
+            'm_e': 0.067,
             'm_hh': 0.51,
             'm_lh': 0.18,
             'epsilonStatic': 10.06,
@@ -265,8 +265,9 @@ class Structure1D:
         """Generate a set of grid for solving differential equation numerically.
         """
 
-        return np.linspace(self.bound_locs[0], self.bound_locs[-1],
-                           num_gridpoint)
+        return [
+            np.linspace(self.bound_locs[0], self.bound_locs[-1], num_gridpoint)
+        ]
 
     def _prepare_structure_stroage(self, dz=1, spline_storage=False):
         """Initialize structure's parameters in `SplineStorage`.
@@ -278,24 +279,24 @@ class Structure1D:
         num_gridpoint = round(self.stack_thick / dz)
         # Generate a identity grid
         self._universal_grid = self.generate_grid(num_gridpoint)
-        eps = np.zeros(self.universal_grid.shape)
-        fi = np.zeros(self.universal_grid.shape)
-        cb_meff = np.zeros(self.universal_grid.shape)
-        doping = np.zeros(self.universal_grid.shape)
+        eps = np.zeros(self.universal_grid[0].shape)
+        fi = np.zeros(self.universal_grid[0].shape)
+        cb_meff = np.zeros(self.universal_grid[0].shape)
+        doping = np.zeros(self.universal_grid[0].shape)
 
         for layer in self.layers:
-            layer_mask = (self.universal_grid >=
-                          layer.loc[0]) * (self.universal_grid <= layer.loc[1])
+            layer_mask = (self.universal_grid[0] >= layer.loc[0]) * (
+                self.universal_grid[0] <= layer.loc[1])
             eps[layer_mask] = layer.eps
             fi[layer_mask] = layer.fi
             cb_meff[layer_mask] = layer.cb_meff
             doping[layer_mask] = layer.doping
         # Choose storage type
         if spline_storage:
-            self.eps = SplineStorage(eps, self.universal_grid)
-            self.fi = SplineStorage(fi, self.universal_grid)
-            self.cb_meff = SplineStorage(cb_meff, self.universal_grid)
-            self.doping = SplineStorage(cb_meff, self.universal_grid)
+            self.eps = SplineStorage(eps, self.universal_grid[0])
+            self.fi = SplineStorage(fi, self.universal_grid[0])
+            self.cb_meff = SplineStorage(cb_meff, self.universal_grid[0])
+            self.doping = SplineStorage(cb_meff, self.universal_grid[0])
         else:
             self.eps = eps
             self.fi = fi
@@ -305,5 +306,106 @@ class Structure1D:
     def delta_doping(self, position, density):
         """Generate doping profile by the modern delta doping."""
 
-        doping = np.zeros(self.universal_grid.shape)
+        doping = np.zeros(self.universal_grid[0].shape)
         self.doping = doping
+
+
+class Structure2D:
+    """Class for modeling 2d material structure.
+
+    Args:
+        layer_list: list of layers, order from top to bottom.
+        temp: Temperature, unit in Kelvin
+    """
+
+    def __init__(self,
+                 layer_list: List[Layer],
+                 width,
+                 temp=0.01,
+                 spline_storage=False,
+                 **kwargs) -> None:
+
+        self.layers = layer_list
+        self.width = width
+        # Structure's parameter
+        self.stack = None
+        self.stack_thick = None
+        self.bound_locs = None  # Boundary locations
+        self.layer_arrange()
+        # Generate a 'universal grid'. Cache data in ndarray with the same
+        # dimension as 'universal grid'.
+        self._universal_grid = None
+        self.dim = None
+        # Structure's properties
+        self.temp = temp
+        self.fi = None
+        self.cb_meff = None
+        self.eps = None
+        self.doping = None
+        self._prepare_structure_stroage(spline_storage=spline_storage, **kwargs)
+
+    @abstractproperty
+    def universal_grid(self):
+        if self._universal_grid is None:
+            self._prepare_structure_stroage()
+        return self._universal_grid
+
+    def layer_arrange(self):
+        """Arrange every layer in `self.layers` and build the stack.
+
+        Args:
+
+        Returns:
+            bound_locs: Highlight the boundary's location.
+        """
+        loc = 0
+        bound_locs = [0.]
+        for layer in self.layers:
+            layer.loc = [loc, loc + layer.thickness]
+            loc += layer.thickness
+            bound_locs.append(loc)
+        self.stack_thick = loc
+        self.stack = [layer.loc for layer in self.layers]
+        self.bound_locs = bound_locs
+
+        return bound_locs
+
+    def generate_grid(self, num_gridpoint, type='fdm'):
+        """Generate a set of grid for solving differential equation numerically.
+        """
+
+        grid_axis_1 = np.linspace(self.bound_locs[0], self.bound_locs[-1],
+                                  num_gridpoint)
+        delta = grid_axis_1[1] - grid_axis_1[0]
+        grid_axis_0 = np.linspace(0, self.width, round(self.width / delta))
+        grid = [grid_axis_0, grid_axis_1]
+        dim = [grid_axis.shape[0] for grid_axis in grid]
+        return grid, dim
+
+    def _prepare_structure_stroage(self, delta=1, spline_storage=False):
+        """Initialize structure's parameters in `SplineStorage`.
+
+        Args:
+            dx: the minimum gap between grid point , unit in nanometer.
+        """
+
+        num_gridpoint = round(self.stack_thick / delta)
+        # Generate a identity grid
+        self._universal_grid, self.dim = self.generate_grid(num_gridpoint)
+        eps = np.zeros(self.universal_grid[1].shape)
+        fi = np.zeros(self.universal_grid[1].shape)
+        cb_meff = np.zeros(self.universal_grid[1].shape)
+        doping = np.zeros(self.universal_grid[1].shape)
+
+        for layer in self.layers:
+            layer_mask = (self.universal_grid[1] >= layer.loc[0]) * (
+                self.universal_grid[1] <= layer.loc[1])
+            eps[layer_mask] = layer.eps
+            fi[layer_mask] = layer.fi
+            cb_meff[layer_mask] = layer.cb_meff
+            doping[layer_mask] = layer.doping
+        # broadcast to 2d grid
+        self.eps = np.broadcast_to(eps, self.dim)
+        self.fi = np.broadcast_to(fi, self.dim)
+        self.cb_meff = np.broadcast_to(cb_meff, self.dim)
+        self.doping = np.broadcast_to(doping, self.dim)
