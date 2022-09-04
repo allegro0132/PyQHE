@@ -51,6 +51,17 @@ def calc_omega(thickness=10, tol=5e-5):
     layer_list.append(Layer(20, 0.24, 0.0, name='barrier'))
 
     model = Structure2D(layer_list, width=50, temp=10, delta=1)
+    # add boundary condition
+    grid = model.universal_grid
+    delta = grid[0][1] - grid[0][0]
+    xv, yv = np.meshgrid(*grid, indexing='ij')
+    top_plate = (yv <= 15) * (yv >= 10)
+    bottom_plate = (yv <= 65) * (yv >= 60)
+    bound = np.empty_like(xv)
+    bound[:] = np.nan
+    bound[top_plate] = 0.05
+    # bound[bottom_plate] = 0
+    model.add_dirichlet_boundary(bound)
     # instance of class SchrodingerPoisson
     schpois = SchrodingerPoisson(
         model,
@@ -74,50 +85,6 @@ def calc_omega(thickness=10, tol=5e-5):
                            antialiased=False)
     plt.show()
 
-    # # fit a normal distribution to the data
-    # def gaussian(x, amplitude, mean, stddev):
-    #     return amplitude * np.exp(-(x - mean)**2 / 2 / stddev**2)
-
-    # popt, _ = optimize.curve_fit(gaussian,
-    #                              res.grid,
-    #                              res.electron_density,
-    #                              p0=[1, np.mean(res.grid), 10])
-    # wf2 = res.wave_function[0] * np.conj(
-    #     res.wave_function[0])  # only ground state
-    # symmetry_axis = popt[1]
-    # # calculate standard deviation
-    # # the standard deviation of the charge distribution from its center, from PRL, 127, 056801 (2021)
-    # charge_distribution = res.electron_density / np.trapz(
-    #     res.electron_density, res.grid)
-    # sigma = np.sqrt(
-    #     np.trapz(charge_distribution * (res.grid - symmetry_axis)**2, res.grid))
-    # plt.plot(res.grid,
-    #          wf2,
-    #          label=r'$|\Psi(z)|^2$')
-    # plt.plot(res.grid,
-    #          charge_distribution,
-    #          label='Charge distribution',
-    #          color='r')
-    # plt.axvline(symmetry_axis - sigma, ls='--', color='y')
-    # plt.axvline(symmetry_axis + sigma, ls='--', color='y')
-    # plt.xlabel('Position (nm)')
-    # plt.ylabel('Distribution')
-    # plt.legend()
-    # plt.show()
-    # # plot factor_q verses q
-    # q_list = np.linspace(0, 1, 20)
-    # f_fh = []
-    # f_self = []
-    # for q in q_list:
-    #     f_fh.append(factor_q_fh(thickness, q))
-    #     f_self.append(factor_q(res.grid, res.wave_function[0], q))
-    # plt.plot(q_list, f_fh, label='the Fang-Howard wave function')
-    # plt.plot(q_list, f_self, label='self-consistent wave function', color='r')
-    # plt.legend()
-    # plt.xlabel('wave vector q')
-    # plt.ylabel(r'$F(q)$')
-    # plt.show()
-
     return res
 
 
@@ -140,29 +107,14 @@ plt.plot(res.grid[1], res.sigma[shape[0]] * 20 * 1e14)
 plt.show()
 plt.plot(res.grid[0], res.sigma[:, shape[1]] * 20 * 1e14)
 # %%
-thickness_list = np.linspace(10, 80, 30)
-res_list = []
-omega_list = []
-for thick in thickness_list:
-    omega, res = calc_omega(thick)
-    res_list.append(res)
-    omega_list.append(omega)
-
-
-# %%
-def line(x, a, b):
-    return a * np.asarray(x) + b
-
-
-popt1, _ = optimize.curve_fit(line, omega_list[:3], thickness_list[:3])
-# %%
-plt.plot(np.asarray(omega_list), thickness_list, label='PyQHE')
-plt.plot(np.asarray(stick_list) * 7.1, stick_nm, label='Shayegan')
-plt.xlabel(r'Layer thickness $\bar{\omega}$ (nm)')
-plt.ylabel(r'Geometry thickness $\omega$ (nm)')
-plt.legend()
-# %%
-res_list[-1].plot_quantum_well()
-# %%
-plt.plot(res.grid, res.params)
+xv, yv = np.meshgrid(*res.grid, indexing='ij')
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+surf = ax.plot_surface(xv,
+                       yv,
+                       res.v_potential,
+                       cmap=cm.coolwarm,
+                       linewidth=0,
+                       antialiased=False)
+plt.show()
+plt.plot(res.grid[1], res.v_potential[shape[0]])
 # %%

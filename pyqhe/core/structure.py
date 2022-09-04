@@ -336,6 +336,7 @@ class Structure2D:
         # dimension as 'universal grid'.
         self._universal_grid = None
         self.dim = None
+        self.bound_dirichlet = None
         # Structure's properties
         self.temp = temp
         self.fi = None
@@ -409,6 +410,10 @@ class Structure2D:
         self.fi = np.broadcast_to(fi, self.dim)
         self.cb_meff = np.broadcast_to(cb_meff, self.dim)
         self.doping = np.broadcast_to(doping, self.dim)
+
+    def add_dirichlet_boundary(self, bound: np.ndarray):
+        if bound.shape == tuple(self.dim):
+            self.bound_dirichlet = bound
 
 
 class Structure3D:

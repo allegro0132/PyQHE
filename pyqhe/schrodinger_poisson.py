@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from pyqhe.equation.schrodinger import SchrodingerSolver, SchrodingerShooting
 from pyqhe.equation.poisson import PoissonSolver, PoissonODE, PoissonFDM
 from pyqhe.utility.fermi import FermiStatistic
-from pyqhe.core.structure import Structure1D
+from pyqhe.core.structure import Structure2D
 
 
 class OptimizeResult:
@@ -72,7 +72,7 @@ class SchrodingerPoisson:
     """
 
     def __init__(self,
-                 model: Structure1D,
+                 model: Structure2D,
                  schsolver: SchrodingerSolver = SchrodingerShooting,
                  poisolver: PoissonSolver = PoissonFDM,
                  learning_rate=0.5,
@@ -87,6 +87,8 @@ class SchrodingerPoisson:
         self.doping = model.doping  # doping profile
         # load grid configure
         self.grid = model.universal_grid
+        # load boundary condition
+        self.bound_dirichlet = model.bound_dirichlet
         # Setup Quantum region
         # if quantum_region is not None and len(quantum_region) == 2:
         #     self.quantum_mask = (self.grid > quantum_region[0]) * (
@@ -102,7 +104,8 @@ class SchrodingerPoisson:
         self.fermi_util = FermiStatistic(self.grid,
                                          self.cb_meff,
                                          self.doping)
-        self.poi_solver = poisolver(self.grid, self.doping, self.eps)
+        self.poi_solver = poisolver(self.grid, self.doping, self.eps,
+                                    self.bound_dirichlet)
         # accumulate charge density
         self.accumulate_q = self.doping
         for grid in self.grid[::-1]:

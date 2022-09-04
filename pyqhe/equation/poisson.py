@@ -85,7 +85,12 @@ class PoissonFDM(PoissonSolver):
             self.eps = eps
         else:
             raise ValueError('The dimension of eps is not match.')
-        self.bound_dirichlet = bound_dirichlet
+        if bound_dirichlet is None:
+            self.bound_dirichlet = None
+        elif bound_dirichlet.shape == tuple(self.dim) or len(self.dim) == 1:
+            self.bound_dirichlet = bound_dirichlet
+        else:
+            raise ValueError('The dimension of eps is not match.')
 
     def build_d_matrix(self, loc):
         """Build 1D time independent Schrodinger equation kinetic operator.
@@ -123,10 +128,11 @@ class PoissonFDM(PoissonSolver):
 
         if self.bound_dirichlet is not None:
             delta = self.grid[0][1] - self.grid[0][0]
+            # adjust coefficient let matrix looks good
             bound_b = self.bound_dirichlet * self.eps / delta**2
             bound_a = np.zeros_like(b_vec)
-            bound_loc = np.flatnonzero(self.bound_dirichlet)
-            bound_a[bound_loc] = self.eps.flatten()[bound_loc] / delta**2
+            bound_loc = np.flatnonzero(~np.isnan(self.bound_dirichlet))
+            bound_a[bound_loc] = 1 * self.eps.flatten()[bound_loc] / delta**2
             # tensor contraction
             bound_mat = np.diag(bound_a)
             a_mat[bound_loc] = bound_mat[bound_loc]
@@ -162,11 +168,12 @@ if __name__ == '__main__':
     top_plate = (yv <= 0.1 + delta / 2) * (yv >= 0.1 - delta / 2)
     bottom_plate = (yv <= -0.1 + delta /2) * (yv >= -0.1 -delta / 2)
     length = (xv <= 0.5) * (xv >= -0.5)
-    bound = np.zeros_like(xv)
+    bound = np.empty_like(xv)
+    bound[:] = np.nan
     bound[top_plate * length] = 1
     bound[bottom_plate * length] = -1
-    sol = PoissonFDM([x, y], np.zeros_like(bound),
-                     np.ones_like(bound) * const.eps0, bound)
+    sol = PoissonFDM([x, y], np.zeros_like(xv),
+                     np.ones_like(xv) * const.eps0, bound)
     # sol = PoissonFDM([x, y], bound * 10,
     #                   np.ones_like(bound) * const.eps0)
     v_p = sol.calc_poisson()
@@ -174,5 +181,5 @@ if __name__ == '__main__':
     plt.pcolormesh(xv, yv, v_p)
     plt.show()
     # e field
-    plt.pcolormesh(xv, yv, np.sqrt(sol.e_field[0]**2 +  sol.e_field[1]**2))
+    plt.pcolormesh(xv, yv, np.sqrt(sol.e_field[0]**2 + sol.e_field[1]**2))
 # %%
