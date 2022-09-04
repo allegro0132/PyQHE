@@ -5,7 +5,7 @@ from scipy.stats import norm
 from matplotlib import pyplot as plt
 from matplotlib import cm
 
-from pyqhe.core.structure import Layer, Structure1D, Structure2D
+from pyqhe.core.structure import Layer, Structure2D, Structure3D
 from pyqhe.schrodinger_poisson import SchrodingerPoisson
 from pyqhe.equation.poisson import PoissonFDM, PoissonODE
 from pyqhe.equation.schrodinger import SchrodingerMatrix
@@ -122,7 +122,7 @@ def calc_omega(thickness=10, tol=5e-5):
 
 
 # %%
-res = calc_omega(30)
+res = calc_omega(20)
 # res.plot_quantum_well()
 # %%
 xv, yv = np.meshgrid(*res.grid, indexing='ij')
@@ -135,7 +135,10 @@ surf = ax.plot_surface(xv,
                        antialiased=False)
 # ax.view_init(0, 90)
 # %%
-plt.plot(res.grid[1], res.sigma[25] * 30 * 1e14)
+shape = np.array([dim / 2 for dim in res.sigma.shape], dtype=int)
+plt.plot(res.grid[1], res.sigma[shape[0]] * 20 * 1e14)
+plt.show()
+plt.plot(res.grid[0], res.sigma[:, shape[1]] * 20 * 1e14)
 # %%
 thickness_list = np.linspace(10, 80, 30)
 res_list = []
