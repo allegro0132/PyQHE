@@ -146,8 +146,11 @@ class SchrodingerMatrix(SchrodingerSolver):
             when solving n-d schrodinger equation, just pass n grid array
     """
 
-    def __init__(self, grid: Union[List[np.ndarray], np.ndarray],
-                 v_potential: np.ndarray, cb_meff: np.ndarray) -> None:
+    def __init__(self,
+                 grid: Union[List[np.ndarray], np.ndarray],
+                 v_potential: np.ndarray,
+                 cb_meff: np.ndarray,
+                 bound_period: list = None) -> None:
         super().__init__()
 
         if not isinstance(grid, list):  # 1d grid
@@ -163,6 +166,14 @@ class SchrodingerMatrix(SchrodingerSolver):
             self.cb_meff = cb_meff
         else:
             raise ValueError('The dimension of cb_meff is not match.')
+
+        if bound_period is None:
+            self.bound_period = [None] * len(self.dim)
+        elif len(bound_period) == len(self.dim):
+            self.bound_period = bound_period
+        else:
+            raise ValueError('The dimension of bound_period is not match.')
+
         self.beta = 1e31
 
     def build_kinetic_operator(self, loc):
@@ -173,6 +184,9 @@ class SchrodingerMatrix(SchrodingerSolver):
         """
         mat_d = -2 * np.eye(self.dim[loc]) + np.eye(
             self.dim[loc], k=-1) + np.eye(self.dim[loc], k=1)
+        if self.bound_period[loc]:  # add period boundary condition
+            mat_d[0, -1] = 1
+            mat_d[-1, 0] = 1
         return mat_d
 
     def build_potential_operator(self, loc):
@@ -188,7 +202,7 @@ class SchrodingerMatrix(SchrodingerSolver):
         # construct V and cb_meff matrix
         # discrete laplacian
         k_mat_list = []
-        for loc, dim in enumerate(self.dim):
+        for loc, _ in enumerate(self.dim):
             mat = self.build_kinetic_operator(loc)
             kron_list = [np.eye(idim) for idim in self.dim[:loc]] + [mat] + [
                 np.eye(idim) for idim in self.dim[loc + 1:]

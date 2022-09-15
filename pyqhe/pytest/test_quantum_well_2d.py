@@ -55,11 +55,12 @@ def calc_omega(thickness=10, tol=5e-5):
     grid = model.universal_grid
     delta = grid[0][1] - grid[0][0]
     xv, yv = np.meshgrid(*grid, indexing='ij')
+    plate_length = (xv < 35) * (xv > 15)
     top_plate = (yv <= 15) * (yv >= 10)
     bottom_plate = (yv <= 65) * (yv >= 60)
     bound = np.empty_like(xv)
     bound[:] = np.nan
-    bound[top_plate] = 0.05
+    bound[top_plate * plate_length] = -0.02  # meV
     # bound[bottom_plate] = 0
     model.add_dirichlet_boundary(bound)
     # instance of class SchrodingerPoisson
@@ -100,12 +101,14 @@ surf = ax.plot_surface(xv,
                        cmap=cm.coolwarm,
                        linewidth=0,
                        antialiased=False)
+plt.show()
 # ax.view_init(0, 90)
 # %%
 shape = np.array([dim / 2 for dim in res.sigma.shape], dtype=int)
-plt.plot(res.grid[1], res.sigma[shape[0]] * 20 * 1e14)
+plt.plot(res.grid[1], res.sigma[shape[0]] * 1e21)
 plt.show()
-plt.plot(res.grid[0], res.sigma[:, shape[1]] * 20 * 1e14)
+plt.plot(res.grid[0], res.sigma[:, 30] * 1e21)
+plt.show()
 # %%
 xv, yv = np.meshgrid(*res.grid, indexing='ij')
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -117,4 +120,11 @@ surf = ax.plot_surface(xv,
                        antialiased=False)
 plt.show()
 plt.plot(res.grid[1], res.v_potential[shape[0]])
+# %%
+e_field = np.sqrt(res.e_field[0]**2 + res.e_field[1]**2)
+plt.pcolormesh(xv, yv, e_field)
+plt.colorbar()
+plt.xlabel('Axis X(nm)')
+plt.ylabel('Axis Z(nm)')
+plt.show()
 # %%

@@ -216,6 +216,7 @@ class Structure1D:
                  layer_list: List[Layer],
                  temp=0.01,
                  spline_storage=False,
+                 bound_period=None,
                  **kwargs) -> None:
 
         self.layers = layer_list
@@ -227,6 +228,11 @@ class Structure1D:
         # Generate a 'universal grid'. Cache data in ndarray with the same
         # dimension as 'universal grid'.
         self._universal_grid = None
+        self.bound_dirichlet = None
+        if bound_period is not None and len(bound_period) == 1:
+            self.bound_period = bound_period
+        else:
+            self.bound_period = [None]
         # Structure's properties
         self.temp = temp
         self.fi = None
@@ -323,6 +329,7 @@ class Structure2D:
                  width,
                  temp=0.01,
                  spline_storage=False,
+                 bound_period=None,
                  **kwargs) -> None:
 
         self.layers = layer_list
@@ -337,6 +344,10 @@ class Structure2D:
         self._universal_grid = None
         self.dim = None
         self.bound_dirichlet = None
+        if bound_period is not None and len(bound_period) == 2:
+            self.bound_period = bound_period
+        else:
+            self.bound_period = [None] * 2
         # Structure's properties
         self.temp = temp
         self.fi = None
@@ -430,6 +441,7 @@ class Structure3D:
                  width,
                  temp=0.01,
                  spline_storage=False,
+                 bound_period=None,
                  **kwargs) -> None:
 
         self.layers = layer_list
@@ -444,6 +456,11 @@ class Structure3D:
         # dimension as 'universal grid'.
         self._universal_grid = None
         self.dim = None
+        self.bound_dirichlet = None
+        if bound_period is not None and len(bound_period) == 3:
+            self.bound_period = bound_period
+        else:
+            self.bound_period = [None] * 3
         # Structure's properties
         self.temp = temp
         self.fi = None

@@ -63,7 +63,9 @@ def calc_omega(thickness=10, tol=5e-5):
     if loss > tol:
         res, loss = schpois.self_consistent_minimize(tol=tol)
     # plot 2DES areal electron density
-    plt.plot(res.grid[0], res.sigma * thickness * 1e14)
+    plt.plot(res.grid[0], res.sigma * 1e21)
+    plt.xlabel('axis z (nm)')
+    plt.ylabel(r'charge density $\rho(z) (cm^{-3})$')
     plt.show()
 
     # fit a normal distribution to the data
@@ -114,7 +116,7 @@ def calc_omega(thickness=10, tol=5e-5):
 
 
 # %%
-_, res = calc_omega(30)
+_, res = calc_omega(20)
 res.plot_quantum_well()
 # %%
 thickness_list = np.linspace(10, 80, 30)

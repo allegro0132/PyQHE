@@ -69,7 +69,8 @@ class PoissonFDM(PoissonSolver):
                  grid: np.ndarray,
                  charge_density: np.ndarray,
                  eps: np.ndarray,
-                 bound_dirichlet: np.ndarray = None) -> None:
+                 bound_dirichlet: np.ndarray = None,
+                 bound_period: list = None) -> None:
         super().__init__()
 
         if not isinstance(grid, list):  # 1d grid
@@ -85,12 +86,19 @@ class PoissonFDM(PoissonSolver):
             self.eps = eps
         else:
             raise ValueError('The dimension of eps is not match.')
+
         if bound_dirichlet is None:
             self.bound_dirichlet = None
         elif bound_dirichlet.shape == tuple(self.dim) or len(self.dim) == 1:
             self.bound_dirichlet = bound_dirichlet
         else:
-            raise ValueError('The dimension of eps is not match.')
+            raise ValueError('The dimension of bound_dirichlet is not match.')
+        if bound_period is None:
+            self.bound_period = [None] * len(self.dim)
+        elif len(bound_period) == len(self.dim):
+            self.bound_period = bound_period
+        else:
+            raise ValueError('The dimension of bound_period is not match.')
 
     def build_d_matrix(self, loc):
         """Build 1D time independent Schrodinger equation kinetic operator.
@@ -100,6 +108,9 @@ class PoissonFDM(PoissonSolver):
         """
         mat_d = -2 * np.eye(self.dim[loc]) + np.eye(
             self.dim[loc], k=-1) + np.eye(self.dim[loc], k=1)
+        if self.bound_period[loc]:  # add period boundary condition
+            mat_d[0, -1] = 1
+            mat_d[-1, 0] = 1
         return mat_d
 
     def calc_poisson(self, **kwargs):

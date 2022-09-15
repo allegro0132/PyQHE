@@ -2,7 +2,7 @@ from typing import List
 import numpy as np
 from matplotlib import pyplot as plt
 
-from pyqhe.equation.schrodinger import SchrodingerSolver, SchrodingerShooting
+from pyqhe.equation.schrodinger import SchrodingerMatrix, SchrodingerSolver, SchrodingerShooting
 from pyqhe.equation.poisson import PoissonSolver, PoissonODE, PoissonFDM
 from pyqhe.utility.fermi import FermiStatistic
 from pyqhe.core.structure import Structure2D
@@ -73,7 +73,7 @@ class SchrodingerPoisson:
 
     def __init__(self,
                  model: Structure2D,
-                 schsolver: SchrodingerSolver = SchrodingerShooting,
+                 schsolver: SchrodingerSolver = SchrodingerMatrix,
                  poisolver: PoissonSolver = PoissonFDM,
                  learning_rate=0.5,
                  quantum_region: List[float] = None,
@@ -89,6 +89,8 @@ class SchrodingerPoisson:
         self.grid = model.universal_grid
         # load boundary condition
         self.bound_dirichlet = model.bound_dirichlet
+        # Load period boundary condition
+        self.bound_period = model.bound_period
         # Setup Quantum region
         # if quantum_region is not None and len(quantum_region) == 2:
         #     self.quantum_mask = (self.grid > quantum_region[0]) * (
@@ -100,12 +102,14 @@ class SchrodingerPoisson:
         # load solver
         self.sch_solver = schsolver(self.grid,
                                     self.fi,
-                                    self.cb_meff)
+                                    self.cb_meff,
+                                    self.bound_period)
         self.fermi_util = FermiStatistic(self.grid,
                                          self.cb_meff,
                                          self.doping)
         self.poi_solver = poisolver(self.grid, self.doping, self.eps,
-                                    self.bound_dirichlet)
+                                    self.bound_dirichlet,
+                                    self.bound_period)
         # accumulate charge density
         self.accumulate_q = self.doping
         for grid in self.grid[::-1]:
