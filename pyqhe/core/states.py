@@ -63,10 +63,10 @@ class FQHBasis:
         # convert to numpy ndarray
         self.occupation_repr = np.array(occupation_repr)
         # construct the map between occupation and index
-        # self.occupation_map = {
-        #     np.array2string(occu_repr): idx
-        #     for idx, occu_repr in enumerate(self.occupation_repr)
-        # }
+        self.occupation_map = {
+            np.array2string(occu_repr): idx
+            for idx, occu_repr in enumerate(self.occupation_repr)
+        }
 
     @property
     def dim(self):
@@ -79,9 +79,9 @@ class FQHBasis:
     def lookup_occu_repr(self, occu_repr):
         """Return the indices of occu_repr"""
         occu_repr = np.asarray(occu_repr, dtype=int)
-        # str_repr = np.array2string(occu_repr)
-        # idx = self.occupation_map[str_repr]
-        idx = np.argwhere((self.occupation_repr == occu_repr).all(axis=-1))
+        str_repr = np.array2string(occu_repr)
+        idx = self.occupation_map[str_repr]
+        # idx = np.argwhere((self.occupation_repr == occu_repr).all(axis=-1))
         return idx
 
 

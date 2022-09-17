@@ -52,7 +52,6 @@ def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
 # %%
 # Quick test
 if __name__ == '__main__':
-    fbasis = FQHBasis(24, 8)
+    fbasis = FQHBasis(18, 6)
     ham = create_hamiltonian(fbasis)
-    print(ham)
 # %%
