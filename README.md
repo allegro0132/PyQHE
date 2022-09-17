@@ -3,7 +3,7 @@ PyQHE is the modularization and high-performance 2-D quantum system simulation f
 PyQHE is built on top of advanced scientific computing frameworks, one can choose backend from numpy, JAX and some commerce software to solve equations.
 
 ## Getting Started
-For more information and introductions, test cases in `pyqhe/pytest` are also informative.
+For more information and introductions, test cases in `examples` are also informative.
 
 ## Install
 The package is purely written in Python.
