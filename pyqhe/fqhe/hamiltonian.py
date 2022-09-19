@@ -22,7 +22,7 @@ def create_hamiltonian_truncated(basis: FQHBasis, potential: Callable = None):
             new_occu_repr[h_idx:h_idx + 4] = [0, 1, 1, 0]
             # lookup correspond basis
             new_loc = basis.lookup_occu_repr(new_occu_repr)
-            mat_row[new_loc] = potential(2, 1)
+            mat_row[new_loc] += potential(2, 1)
         # find |...11...> scheme
         nj_nj1_idx = target_idx[np.nonzero(diff_idx == 1)]
         for n1_idx in nj_nj1_idx:
@@ -45,7 +45,8 @@ def create_hamiltonian_truncated(basis: FQHBasis, potential: Callable = None):
         ham.append(mat_row)
     ham = np.stack(ham)
     # add hermitian conjugate
-    return ham + np.conj(ham).T
+    ham_dag = np.conj(ham).T
+    return ham + ham_dag - np.diag(np.diag(ham_dag))
 
 
 def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
@@ -77,10 +78,10 @@ def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
                                                 j4])] = [0, 0, 1, 1]
                         # lookup correspond basis
                         new_loc = basis.lookup_occu_repr(new_occu_repr)
-                        mat_row[new_loc] = potential(k_idx, m_idx)
+                        mat_row[new_loc] += potential(k_idx, m_idx)
                     elif (m_idx == 0) and (j2 in target_idx):
                         # number operator
-                        mat_row[loc] = potential(k_idx, m_idx)
+                        mat_row[loc] += potential(k_idx, m_idx)
         ham.append(mat_row)
     ham = np.stack(ham)
     return ham
@@ -89,6 +90,6 @@ def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
 # %%
 # Quick test
 if __name__ == '__main__':
-    fbasis = FQHBasis(6, 2)
+    fbasis = FQHBasis(6, 3)
     ham = create_hamiltonian(fbasis, lambda k, m: 1)
 # %%
