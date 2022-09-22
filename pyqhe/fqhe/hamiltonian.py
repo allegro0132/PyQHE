@@ -11,7 +11,7 @@ def create_hamiltonian_truncated(basis: FQHBasis, potential: Callable = None):
     ham = []
     # construct hamiltonian row by row
     for loc, occu_repr in enumerate(basis.occupation_repr):
-        mat_row = np.zeros(basis.dim)
+        mat_row = np.zeros(basis.dim, dtype=complex)
         target_idx = np.argwhere(occu_repr).flatten()
         # find |...1001...> scheme
         diff_idx = np.diff(target_idx)
@@ -55,7 +55,7 @@ def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
     num_orbit = basis.num_orbit
     # construct hamiltonian row by row
     for loc, occu_repr in enumerate(basis.occupation_repr):
-        mat_row = np.zeros(basis.dim)
+        mat_row = np.zeros(basis.dim, dtype=complex)
         target_idx = np.argwhere(occu_repr).flatten()
         for j_idx in target_idx:  # nonzero terms correspond to c_j
             # get the range of m
@@ -90,6 +90,6 @@ def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
 # %%
 # Quick test
 if __name__ == '__main__':
-    fbasis = FQHBasis(6, 3)
+    fbasis = FQHBasis(15, 5)
     ham = create_hamiltonian(fbasis, lambda k, m: 1)
 # %%
