@@ -50,5 +50,8 @@ setup(
     license=license,
     classifiers=classifiers,
     packages=find_packages(),
+    install_requires=[
+          'numpy', 'scipy', 'matplotlib'
+      ],
     include_package_data=True
 )

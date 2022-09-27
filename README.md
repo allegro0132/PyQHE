@@ -10,12 +10,12 @@ The package is purely written in Python.
 
 - Pull the repository
 ```bash
-git pull https://github.com/allegro0132/PyQHE.git
+git clone https://github.com/allegro0132/PyQHE.git
 ```
 
 - PyQHE can be obtained via pip as:
 ```python
-pip install .
+pip install -e .
 ```
 
 ## Advantages
