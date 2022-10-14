@@ -78,7 +78,11 @@ def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
                                                 j4])] = [0, 0, 1, 1]
                         # lookup correspond basis
                         new_loc = basis.lookup_occu_repr(new_occu_repr)
-                        mat_row[new_loc] += potential(k_idx, m_idx)
+                        nsign = np.sum(
+                            new_occu_repr[min([j3, j4]) + 1:max([j3, j4])]
+                        ) + np.sum(occu_repr[j_idx + 1:j2])  # fermion sign
+                        mat_row[new_loc] += potential(k_idx,
+                                                      m_idx) * (-1)**nsign
                     elif (m_idx == 0) and (j2 in target_idx):
                         # number operator
                         mat_row[loc] += potential(k_idx, m_idx)
@@ -90,6 +94,6 @@ def create_hamiltonian(basis: FQHBasis, potential: Callable = None):
 # %%
 # Quick test
 if __name__ == '__main__':
-    fbasis = FQHBasis(15, 5)
+    fbasis = FQHBasis(10, 4)
     ham = create_hamiltonian(fbasis, lambda k, m: 1)
 # %%
