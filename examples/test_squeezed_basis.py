@@ -11,7 +11,7 @@ np.set_printoptions(threshold=np.inf)
 
 # %%
 # test FQHBasis
-fbasis = FQHBasis(13, 5)
+fbasis = FQHBasis(10, 4)
 print(fbasis.occupation_repr)
 
 # %%
@@ -20,7 +20,7 @@ l_2 = 5.77
 
 g_m = gm_tensor(0.2, 0.0)
 pot = lambda idx_k, idx_m: potential_interaction(idx_k, idx_m, g_m, l_2)
-ham = create_hamiltonian(fbasis, pot)
+ham = create_hamiltonian_truncated(fbasis, pot)
 print(ham)
 
 # %%
@@ -31,7 +31,7 @@ eig_val, eig_vec = scipyLA.eigh(ham)
 wave_function = eig_vec[:, 0]
 print(wave_function)
 # tidy up small value
-tidy_up = np.abs(wave_function) < 0.05
+tidy_up = np.abs(wave_function) < 1e-5
 wf_norm = wave_function.copy()
 wf_norm[tidy_up] = 0
 # normalize
